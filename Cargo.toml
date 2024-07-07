@@ -9,7 +9,7 @@ name = "bevy-ui"
 path = "src/main.rs"
 
 [dependencies]
-bevy = "0.14.0"
+bevy = {version = "0.14.0"}
 ash = "0.38.0"
 ash-window = "0.13.0"
 winit = { version = "0.29", features = ["rwh_06", "x11"] }
@@ -17,3 +17,5 @@ imgui = "0.12.0"
 imgui-winit-support = "0.12.0"
 voxelengine = {path = "voxelengine"}    
 bevy_winit = "0.14.0"
+bevy_reflect = "0.14.0"
+serde = "1.0.204"

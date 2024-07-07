@@ -13,12 +13,14 @@ use bevy::{
     window::Window,
     DefaultPlugins,
 };
+use bevy_reflect::Reflect;
+use reflection::{list_all_components, setup_entities, setup_reflection, Bar};
 use winit::{
     event_loop::{self, EventLoop, EventLoopBuilder},
     platform::x11::EventLoopBuilderExtX11,
 };
 
-#[derive(Component)]
+#[derive(Reflect, Component)]
 struct Position {
     x: f32,
     y: f32,
@@ -30,50 +32,15 @@ struct Person;
 struct Name(String);
 
 mod appliction;
-#[derive(Component)]
-struct MyCameraMarker;
-fn setup_camera(mut commands: Commands) {
-    commands.spawn((
-        Camera3dBundle { transform: Transform::from_xyz(10.0, 12.0, 16.0).looking_at(Vec3::ZERO, Vec3::Y), ..default() },
-        MyCameraMarker,
-    ));
-}
+mod reflection;
 
 // TODO, create one for wayland and windows
 
-
-
 fn main() {
     let mut app = App::new();
-    let mut bevy_closed = Arc::new(Mutex::new(true));
-    let mut imgui_closed = Arc::new(Mutex::new(true));
-    
-    // println!("hello muta");
-    app.add_plugins((EditorPlugin, DefaultPlugins))
-        .add_systems(Startup, (add_people, setup_scene, setup_camera))
-        .add_systems(Update, ((print_position_system, greet_people)).chain())
+    app.add_plugins(EditorPlugin)
+        .add_systems(Startup, (setup_reflection, setup_entities, list_all_components).chain())
         .run();
-}
 
-fn add_people(mut commands: Commands) {
-    // commands.spawn((Person, Name("Elaina Proctor".to_string())));
-    // commands.spawn((Person, Name("Renzo Hume".to_string())));
-    // commands.spawn((Person, Name("Zayna Nieves".to_string())));
-}
-
-fn print_position_system(query: Query<&Position>) {
-    for position in &query {
-        println!("position: {} {}", position.x, position.y);
-    }
-}
-
-fn greet_people(query: Query<&Name, With<Person>>) {
-    for name in &query {
-        println!("hello {}!", name.0);
-    }
-}
-
-fn setup_scene(mut commands: Commands) {
-    // add entities to the world
-    // Spawn a second window
+    // println!("hello muta");
 }
