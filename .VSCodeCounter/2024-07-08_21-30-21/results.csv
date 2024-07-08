@@ -1,0 +1,22 @@
+"filename", "language", "Rust", "Shell Script", "comment", "blank", "total"
+"/home/tom/projects/bevyui/build.rs", "Rust", 5, 0, 3, 4, 12
+"/home/tom/projects/bevyui/build_shader.sh", "Shell Script", 0, 9, 4, 4, 17
+"/home/tom/projects/bevyui/src/editor/mod.rs", "Rust", 110, 0, 1, 33, 144
+"/home/tom/projects/bevyui/src/editor/reflection.rs", "Rust", 104, 0, 20, 21, 145
+"/home/tom/projects/bevyui/src/main.rs", "Rust", 37, 0, 1, 7, 45
+"/home/tom/projects/bevyui/voxelengine/src/App.rs", "Rust", 86, 0, 2, 20, 108
+"/home/tom/projects/bevyui/voxelengine/src/core/camera.rs", "Rust", 224, 0, 25, 64, 313
+"/home/tom/projects/bevyui/voxelengine/src/core/mod.rs", "Rust", 1, 0, 0, 1, 2
+"/home/tom/projects/bevyui/voxelengine/src/lib.rs", "Rust", 19, 0, 0, 6, 25
+"/home/tom/projects/bevyui/voxelengine/src/physics/mod.rs", "Rust", 14, 0, 0, 4, 18
+"/home/tom/projects/bevyui/voxelengine/src/terrain/block.rs", "Rust", 102, 0, 3, 27, 132
+"/home/tom/projects/bevyui/voxelengine/src/terrain/mod.rs", "Rust", 697, 0, 70, 172, 939
+"/home/tom/projects/bevyui/voxelengine/src/terrain/octree.rs", "Rust", 174, 0, 23, 42, 239
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/builder.rs", "Rust", 613, 0, 14, 131, 758
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/init.rs", "Rust", 154, 0, 0, 21, 175
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/loader.rs", "Rust", 125, 0, 15, 20, 160
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/mesh.rs", "Rust", 494, 0, 6, 34, 534
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/mod.rs", "Rust", 658, 0, 9, 153, 820
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/resource.rs", "Rust", 916, 0, 34, 156, 1106
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/util.rs", "Rust", 515, 0, 6, 112, 633
+"Total", "-", 5048, 9, 236, 1032, 6325

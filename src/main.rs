@@ -4,17 +4,21 @@ use std::{
     time::Duration,
 };
 
-use appliction::{EditorPlugin, ImguiApp};
 use bevy::{
     app::{App, Plugin, Startup, Update},
+    core::{FrameCountPlugin, TaskPoolPlugin},
+    log::LogPlugin,
     math::Vec3,
-    prelude::{default, Camera3dBundle, Commands, Component, IntoSystemConfigs, Query, Res, With},
+    prelude::{default, Camera3dBundle, Commands, Component, IntoSystemConfigs, Query, Res, ResMut, With},
+    time::TimePlugin,
     transform::components::Transform,
-    window::Window,
+    window::{Window, WindowPlugin},
     DefaultPlugins,
 };
-use bevy_reflect::Reflect;
-use reflection::{list_all_components, setup_entities, setup_reflection, Bar};
+use bevy_framepace::Limiter;
+use bevy_reflect::{Reflect, TypeRegistration};
+use bevy_winit::WinitPlugin;
+use editor::EditorPlugin;
 use winit::{
     event_loop::{self, EventLoop, EventLoopBuilder},
     platform::x11::EventLoopBuilderExtX11,
@@ -31,16 +35,17 @@ struct Person;
 #[derive(Component)]
 struct Name(String);
 
-mod appliction;
-mod reflection;
+mod editor;
 
-// TODO, create one for wayland and windows
+fn startup(mut r: ResMut<bevy_framepace::FramepaceSettings>) {
+    r.limiter = Limiter::from_framerate(60.0);
+}
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins(EditorPlugin)
-        .add_systems(Startup, (setup_reflection, setup_entities, list_all_components).chain())
-        .run();
+    // app.add_plugins((DefaultPlugins, EditorPlugin, bevy_framepace::FramepacePlugin))
+    //     .add_systems(Startup, (startup))
+    //     .run();
 
-    // println!("hello muta");
+    app.add_plugins((EditorPlugin)).run();
 }
