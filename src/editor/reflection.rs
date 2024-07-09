@@ -1,25 +1,23 @@
-use std::{alloc::Layout, any::Any, borrow::BorrowMut};
+use std::{alloc::Layout, any::Any, borrow::BorrowMut, mem::transmute};
 
 use bevy::{a11y::accesskit::Invalid, log::tracing_subscriber::field, prelude::*};
-use bevy_reflect::{GetTypeRegistration, TypeData, TypeRegistration};
+use bevy_reflect::{DynamicTypePath, GetTypeRegistration, TypeData, TypeRegistration};
 
 #[derive(Reflect, Default, Component)]
 #[reflect(Component)]
 pub struct Foo {
     a: usize,
-    nested: Bar,
-    #[reflect(ignore)]
-    _ignored: NonReflectedValue,
 }
 
 /// This `Bar` type is used in the `nested` field on the `Test` type. We must derive `Reflect` here
 /// too (or ignore it)
+#[repr(C)]
 #[derive(Component, Reflect, Debug, Default)]
 #[reflect(Component)]
 pub struct Bar {
-    b: usize,
-    t: u32,
-    bba: u16,
+    pub b: usize,
+    pub t: u32,
+    pub bba: u16,
 }
 
 #[derive(Default, Reflect)]
@@ -27,46 +25,108 @@ pub struct Bar {
 struct NonReflectedValue {
     _a: usize,
 }
+#[repr(C)]
 #[derive(Clone, Copy)]
-enum FieldType {
-    Invalid,
-    UInt,
-    IInt,
-    Str,
+pub enum FieldType {
+    Invalid = 0,
+    USIZE,
+    U64,
+    U32,
+    U16,
+    U8,
+    ISIZE,
+    I64,
+    I32,
+    I16,
+    I8,
+    String,
 }
 
-impl From<&str> for FieldType {
-    fn from(value: &str) -> Self {
-        match value {
-            "u32" | "u16" | "u8" => FieldType::UInt,
-            "i32" | "i16" | "iu8" => FieldType::IInt,
-            "Str" | "String" => FieldType::Str,
-            _ => FieldType::Invalid,
+const SIZE_LOOK_UP_TABLE: [usize; 12] = [0, 8, 8, 4, 2, 1, 8, 8, 4, 2, 1, 24];
+
+impl FieldType {
+    /// get the size of the field data in bytes
+    pub fn get_size(&self) -> usize {
+        unsafe {
+            let index: u32 = transmute(*self);
+            SIZE_LOOK_UP_TABLE[index as usize]
         }
     }
 }
-struct Field {
-    /// the reason you cannot have a ptr toward the field, is because it can change.
-    pub data: Vec<u8>,
-    pub name: String,
+
+impl Default for FieldType {
+    fn default() -> Self {
+        Self::Invalid
+    }
+}
+
+impl From<&str> for (FieldType) {
+    fn from(value: &str) -> Self {
+        match value {
+            "usize" => Self::USIZE,
+            "u64" => Self::U64,
+            "u32" => Self::U32,
+            "u16" => Self::U16,
+            "u8" => Self::U8,
+
+            "isize" => Self::ISIZE,
+            "i64" => Self::I64,
+            "i32" => Self::I32,
+            "i16" => Self::I16,
+            "i8" => Self::I8,
+
+            _ => Self::Invalid,
+        }
+    }
+}
+#[repr(C)]
+#[derive(Default, Clone)]
+pub struct Field {
     pub type_: FieldType,
+    pub name: String,
 }
 
 impl Field {
-    pub fn new(name: String, data: Vec<u8>, type_: FieldType) -> Self {
-        Field { name, data, type_ }
+    pub fn new(name: String, type_: FieldType) -> Self {
+        Field { name, type_ }
     }
 }
+#[repr(C)]
 pub struct Component {
     pub name: String,
     pub layout: Layout,
     pub fields: Vec<Field>,
+    pub data: *mut u8,
 }
+
+impl Component {
+    pub fn clone(&self) -> Self {
+        let mut fields: Vec<Field> = vec![];
+        for i in 0..self.fields.len() {
+            fields.push(self.fields[i].clone());
+        }
+
+        Self { name: self.name.clone(), layout: self.layout, fields, data: self.data.clone() }
+    }
+}
+#[repr(C)]
 pub struct EntityMeta {
     /// will be used in order to reflect changes later on
     pub id: Entity,
     // used in order to display the information
     pub components: Vec<Component>,
+}
+
+impl EntityMeta {
+    pub fn clone(&self) -> Self {
+        let mut v = Vec::with_capacity(self.components.len());
+
+        for i in 0..self.components.len() {
+            v.push(self.components[i].clone());
+        }
+
+        Self { id: self.id, components: v }
+    }
 }
 
 impl Default for EntityMeta {
@@ -75,7 +135,7 @@ impl Default for EntityMeta {
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Default)]
 pub struct EntitiesMeta {
     pub data: Vec<EntityMeta>,
 }
@@ -113,7 +173,7 @@ pub fn parse_world_entities_data(world: &mut World) {
 
         for (entity, _) in query.iter(&world) {
             let archetype = entity.archetype();
-            
+
             entities_meta.push(EntityMeta { id: entity.id(), components: vec![] });
             let last_index = entities_meta.len() - 1;
             let entity_meta = &mut entities_meta[last_index];
@@ -121,15 +181,20 @@ pub fn parse_world_entities_data(world: &mut World) {
             for component_id in archetype.components() {
                 if let Some(component_info) = world.components().get_info(component_id) {
                     let is_reflect = type_registry.get(component_info.type_id().unwrap());
-
                     match is_reflect {
                         Some(reflect_component) => {
                             component_info.layout();
-                            entity_meta.components.push(Component {
-                                name: component_info.name().to_owned(),
-                                fields: parse(reflect_component),
-                                layout: component_info.layout(),
-                            });
+                            let data = entity.get_by_id(component_id).unwrap();
+                            let u = [50];
+                            unsafe {
+                                std::ptr::copy(u.as_ptr(), data.as_ptr(), 1);
+                                entity_meta.components.push(Component {
+                                    name: reflect_component.type_info().type_path_table().short_path().to_owned(), // TODO, can do this
+                                    fields: parse(reflect_component),
+                                    layout: component_info.layout(),
+                                    data: data.as_ptr(),
+                                });
+                            }
                         }
                         None => {}
                     }
@@ -140,7 +205,15 @@ pub fn parse_world_entities_data(world: &mut World) {
             }
         }
     }
-    world.resource_mut::<EntitiesMeta>().as_mut().data = entities_meta;
+    world.non_send_resource_mut::<EntitiesMeta>().as_mut().data = entities_meta;
+}
+
+pub fn write_out_data(query: Query<&Bar>) {
+    for bar in query.iter() {
+        println!("b: {}", bar.b);
+        println!("bba: {}", bar.bba);
+        println!("t: {}", bar.t);
+    }
 }
 
 fn parse(generic_component: &TypeRegistration) -> Vec<Field> {
@@ -152,7 +225,7 @@ fn parse(generic_component: &TypeRegistration) -> Vec<Field> {
                 let field = x.field_at(i).unwrap().type_path_table();
                 let field_name = x.field_at(i).unwrap().name().to_owned();
                 let field_ident = field.ident().unwrap();
-                fields.push(Field::new(field_name, vec![], FieldType::from(field_ident)));
+                fields.push(Field::new(field_name, FieldType::from(field_ident)));
             }
             fields
         }
