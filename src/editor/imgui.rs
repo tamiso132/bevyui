@@ -1,18 +1,21 @@
-use std::{
-    cmp::{max, min},
-    collections::HashMap,
-    mem::transmute,
-    ptr::copy_nonoverlapping,
-    time::{Duration, Instant},
-};
-
 use ash::vk::{self, Extent2D};
 use bevy::{
     app::{Plugin, Startup, Update},
     prelude::{Commands, Entity, NonSendMut, Res},
 };
 use imgui::{Condition, Ui};
+use lazy_static::lazy_static;
+use once_cell::unsync::Lazy;
 use reflection::{EntitiesMeta, EntityMeta, Foo, ReflectionMarker};
+use std::{
+    cmp::{max, min},
+    collections::HashMap,
+    mem::transmute,
+    ops::{Deref, DerefMut},
+    ptr::copy_nonoverlapping,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use voxelengine::{
     vulkan::{util, VulkanContext},
     App::ApplicationTrait,
@@ -47,7 +50,13 @@ impl HierachyWindow {
         Self { window: true, width: 0.2, max_width: (200.0) }
     }
 
-    fn draw_hierachy<'a>(&mut self, ui: &mut Ui, window_extent: Extent2D, entities: &'a mut NonSendMut<EntitiesMeta>) -> Option<&'a mut EntityMeta> {
+    fn draw_hierachy<'a>(
+        &mut self,
+        ui: &mut Ui,
+        hdpi_scale: f32,
+        window_extent: Extent2D,
+        entities: &'a mut NonSendMut<EntitiesMeta>,
+    ) -> Option<EntityMeta> {
         let extent = window_extent;
         let inspector_width = window_extent.width as f32 * 0.3;
 
@@ -72,7 +81,7 @@ impl HierachyWindow {
                 ui.spacing();
             }
             if index > 0 {
-                entity_pressed = Some(&mut entities.data[index as usize]);
+                entity_pressed = Some(entities.data[index as usize].clone());
             }
         });
         entity_pressed
@@ -102,26 +111,26 @@ impl InspectorWindow {
             numbers: HashMap::new(),
         }
     }
-    fn draw_entity(&mut self, entity: &mut EntityMeta) {}
-    fn draw_inspector(&mut self, ui: &mut Ui, window_extent: Extent2D, entity: Option<&mut EntityMeta>) {
+    fn draw_inspector(&mut self, ui: &mut Ui, hdpi_scale: f32, window_extent: Extent2D, entity: &mut Option<EntityMeta>) {
         let extent = window_extent;
-        let inspector_width = window_extent.width as f32 * 0.3;
+        let inspector_width = window_extent.width as f32 * 0.5;
 
         let window_width = min(self.max_width as u32, inspector_width as u32) as f32;
-
+        let pos_x = (window_extent.width as f32) / hdpi_scale;
+        let size = ui.window_content_region_max();
+        println!("Pos X: {:?}\nWindow Size: {}", pos_x, window_width);
         let w = ui
             .window("Inspector")
             .opened(&mut self.window)
-            .position([extent.width as f32 - window_width, 0.0], Condition::Always)
+            .position([pos_x - window_width, 0.0], Condition::Always)
             .size([window_width, extent.height as f32], Condition::Always);
-
         w.build(|| {
             let c_text = "this is a component";
 
             if entity.is_some() {
                 self.numbers.clear();
 
-                let entity_meta = entity.unwrap();
+                let entity_meta = entity.as_mut().unwrap();
                 let components_max = entity_meta.components.len();
                 if components_max > self.headers.len() {
                     for _ in 0..components_max - self.headers.len() {
@@ -147,11 +156,11 @@ impl InspectorWindow {
                                 | reflection::FieldType::U32
                                 | reflection::FieldType::U16
                                 | reflection::FieldType::U8 => {
-                                    let number = ptr_to_u64(data_ptr, field.type_.get_size());
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                    self.numbers.insert((i, f), number as i32);
-                                    let value = self.numbers.get_mut(&(i, f)).unwrap();
-                                    ui.input_int(field.name.clone(), value).build();
+                                    // let number = ptr_to_u64(data_ptr, field.type_.get_size());
+                                    // data_ptr = data_ptr.add(field.type_.get_size());
+                                    // self.numbers.insert((i, f), number as i32);
+                                    // let value = self.numbers.get_mut(&(i, f)).unwrap();
+                                    // ui.input_int(field.name.clone(), value).build();
                                 }
                                 reflection::FieldType::ISIZE => todo!(),
                                 reflection::FieldType::I64 => todo!(),
@@ -226,10 +235,15 @@ pub struct ImguiApp {
 const HZ_MAX: i64 = (1000.0 / 60.0) as i64;
 
 impl ImguiApp {
-    pub fn run_non_block(&mut self, event_loop: &mut EventLoop<()>, mut entities_meta: &mut NonSendMut<EntitiesMeta>) {
+    pub fn run_non_block(
+        &mut self,
+        event_loop: &mut EventLoop<()>,
+        mut entities_meta: &mut NonSendMut<EntitiesMeta>,
+        entity: &mut NonSendMut<EntityMeta>,
+    ) {
         if !self.exit {
             event_loop.pump_events(Some(Duration::ZERO), |event, _control_flow| {
-                self.run_event(event, _control_flow, &mut entities_meta);
+                self.run_event(event, _control_flow, &mut entities_meta, entity);
             });
 
             if self.exit {
@@ -243,7 +257,13 @@ impl ImguiApp {
         }
     }
 
-    fn run_event(&mut self, event: Event<()>, _control_flow: &EventLoopWindowTarget<()>, entities_meta: &mut NonSendMut<EntitiesMeta>) {
+    fn run_event(
+        &mut self,
+        event: Event<()>,
+        _control_flow: &EventLoopWindowTarget<()>,
+        entities_meta: &mut NonSendMut<EntitiesMeta>,
+        mut entity: &mut NonSendMut<EntityMeta>,
+    ) {
         self.on_new_frame(&event);
 
         match event {
@@ -255,7 +275,7 @@ impl ImguiApp {
                     self.resize_event();
                 }
                 WindowEvent::RedrawRequested => {
-                    self.on_draw(entities_meta);
+                    self.on_draw(entities_meta, entity);
                 }
 
                 _ => {}
@@ -310,7 +330,7 @@ impl ImguiApp {
         self.vulkan.imgui.as_mut().unwrap().process_event_imgui(&self.vulkan.window, &event);
     }
 
-    fn on_draw(&mut self, entities: &mut NonSendMut<EntitiesMeta>) {
+    fn on_draw(&mut self, entities: &mut NonSendMut<EntitiesMeta>, entity: &mut NonSendMut<EntityMeta>) {
         self.vulkan.prepare_frame(&mut self.resize);
 
         if self.resize {
@@ -335,10 +355,18 @@ impl ImguiApp {
         let imgui = self.vulkan.imgui.as_mut().unwrap();
         let mut ui = imgui.get_draw_instance(&self.vulkan.window);
 
-        // Self::draw_inspector(&mut ui, &mut self.window, self.vulkan.window_extent);
-        let entity_meta = self.hierachy.draw_hierachy(&mut ui, self.vulkan.window_extent, entities);
-        self.inspector.draw_inspector(&mut ui, self.vulkan.window_extent, entity_meta);
+        let mut entity_meta = self
+            .hierachy
+            .draw_hierachy(&mut ui, self.vulkan.window.scale_factor() as f32, self.vulkan.window_extent, entities);
+        self.inspector
+            .draw_inspector(&mut ui, self.vulkan.window.scale_factor() as f32, self.vulkan.window_extent, &mut entity_meta);
 
+        if entity_meta.is_some() {
+            let d = entity_meta.unwrap();
+            entity.deref_mut().id = d.id;
+            entity.deref_mut().components = d.components;
+        }
+        ui.show_demo_window(&mut true);
         imgui.render(
             self.vulkan.window_extent,
             &self.vulkan.swapchain.images[self.vulkan.swapchain.image_index as usize],

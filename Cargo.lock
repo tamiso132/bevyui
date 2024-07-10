@@ -457,6 +457,8 @@ dependencies = [
  "bevy_winit",
  "imgui",
  "imgui-winit-support",
+ "lazy_static",
+ "once_cell",
  "serde",
  "voxelengine",
  "winit 0.29.15",

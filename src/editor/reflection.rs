@@ -159,8 +159,8 @@ pub fn overwrite_value(entities_meta: Vec<EntityMeta>) {
     for e in entities_meta {}
 }
 
-pub fn mutate_entities_data(query: Query<(Entity, &ReflectionMarker)>) {
-    for (e, _) in query.iter() {}
+pub fn mutate_entities_data(enity_ref: NonSendMut<EntityMeta>) {
+    
 }
 // query: Query<(EntityRef, &ReflectionMarker)>, mut meta: ResMut<EntitiesMeta>
 pub fn parse_world_entities_data(world: &mut World) {

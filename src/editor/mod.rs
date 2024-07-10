@@ -3,7 +3,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ash::vk::{self, Extent2D};
+use ash::{
+    valve::mutable_descriptor_type,
+    vk::{self, Extent2D},
+};
 use bevy::{
     app::{Plugin, Startup, Update},
     prelude::{Commands, IntoSystemConfigs, NonSendMut, Res},
@@ -22,7 +25,12 @@ mod reflection;
 pub struct EditorPlugin;
 
 impl EditorPlugin {
-    fn update_imgui(mut context: NonSendMut<ImguiApp>, mut event_loop: NonSendMut<EventLoop<()>>, mut entities_meta: NonSendMut<EntitiesMeta>) {
+    fn update_imgui(
+        mut context: NonSendMut<ImguiApp>,
+        mut event_loop: NonSendMut<EventLoop<()>>,
+        mut entities_meta: NonSendMut<EntitiesMeta>,
+        mut entity: NonSendMut<EntityMeta>,
+    ) {
         // let diff = entities_meta.data.len() - context.entities.len();
         // if diff > 0 {
         //     for _ in 0..diff {
@@ -36,8 +44,9 @@ impl EditorPlugin {
 
         //     std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, entities_meta.data.len());
         // }
-
-        context.run_non_block(&mut event_loop, &mut entities_meta);
+        loop {
+            context.run_non_block(&mut event_loop, &mut entities_meta, &mut entity);
+        }
     }
 }
 
@@ -58,8 +67,9 @@ impl Plugin for EditorPlugin {
         let imgui_app = ImguiApp::on_new(&event_loop);
 
         app.insert_non_send_resource(imgui_app);
-        app.insert_non_send_resource(event_loop);
         app.insert_non_send_resource(reflection::EntitiesMeta { data: vec![] });
+        app.insert_non_send_resource(EntityMeta::default());
+        app.insert_non_send_resource(event_loop);
 
         app.add_systems(Startup, (test_spawn, reflection::setup_reflection).chain());
         app.add_systems(

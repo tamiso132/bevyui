@@ -47,5 +47,5 @@ fn main() {
     //     .add_systems(Startup, (startup))
     //     .run();
 
-    app.add_plugins((DefaultPlugins, EditorPlugin)).run();
+    app.add_plugins((EditorPlugin)).run();
 }
