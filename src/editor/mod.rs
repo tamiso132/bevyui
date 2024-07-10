@@ -44,9 +44,7 @@ impl EditorPlugin {
 
         //     std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, entities_meta.data.len());
         // }
-        loop {
-            context.run_non_block(&mut event_loop, &mut entities_meta, &mut entity);
-        }
+        context.run_non_block(&mut event_loop, &mut entities_meta, &mut entity);
     }
 }
 
@@ -56,8 +54,9 @@ fn create_event_loop() -> EventLoop<()> {
 
 fn test_spawn(mut commands: Commands) {
     // commands.spawn((Foo::default(), ReflectionMarker::default()));
-    commands.spawn((Foo::default(), ReflectionMarker::default()));
-    commands.spawn((Bar { b: 2, t: 7, bba: 15 }, ReflectionMarker::default()));
+    let one = commands.spawn((Foo::default(), ReflectionMarker::default()));
+    let two = commands.spawn((Bar { b: 2, t: 7, bba: 15, l: 10 }, ReflectionMarker::default()));
+    let x = 5;
 }
 
 impl Plugin for EditorPlugin {
@@ -74,7 +73,13 @@ impl Plugin for EditorPlugin {
         app.add_systems(Startup, (test_spawn, reflection::setup_reflection).chain());
         app.add_systems(
             Update,
-            (reflection::parse_world_entities_data, EditorPlugin::update_imgui, reflection::write_out_data).chain(),
+            (
+                reflection::parse_world_entities_data,
+                EditorPlugin::update_imgui,
+                reflection::mutate_data,
+                reflection::write_out_data,
+            )
+                .chain(),
         );
     }
 }

@@ -1,6 +1,11 @@
-use std::{alloc::Layout, any::Any, borrow::BorrowMut, mem::transmute};
+use std::{alloc::Layout, any::Any, borrow::BorrowMut, mem::transmute, ptr::copy_nonoverlapping};
 
-use bevy::{a11y::accesskit::Invalid, log::tracing_subscriber::field, prelude::*};
+use bevy::{
+    a11y::accesskit::Invalid,
+    ecs::{component::ComponentId, observer::TriggerTargets},
+    log::tracing_subscriber::field,
+    prelude::*,
+};
 use bevy_reflect::{DynamicTypePath, GetTypeRegistration, TypeData, TypeRegistration};
 
 #[derive(Reflect, Default, Component)]
@@ -15,9 +20,10 @@ pub struct Foo {
 #[derive(Component, Reflect, Debug, Default)]
 #[reflect(Component)]
 pub struct Bar {
-    pub b: usize,
-    pub t: u32,
-    pub bba: u16,
+    pub b: u8,
+    pub t: u8,
+    pub bba: u8,
+    pub l: u8,
 }
 
 #[derive(Default, Reflect)]
@@ -96,7 +102,8 @@ pub struct Component {
     pub name: String,
     pub layout: Layout,
     pub fields: Vec<Field>,
-    pub data: *mut u8,
+    pub id: ComponentId,
+    pub data: Vec<u8>,
 }
 
 impl Component {
@@ -106,7 +113,7 @@ impl Component {
             fields.push(self.fields[i].clone());
         }
 
-        Self { name: self.name.clone(), layout: self.layout, fields, data: self.data.clone() }
+        Self { name: self.name.clone(), layout: self.layout, fields, data: self.data.clone(), id: self.id }
     }
 }
 #[repr(C)]
@@ -147,7 +154,6 @@ pub fn setup_reflection(world: &World) {
     let type_registry = world.get_resource::<AppTypeRegistry>().unwrap();
     let b = type_registry.write().add_registration(Bar::get_type_registration());
     let b = type_registry.write().add_registration(Foo::get_type_registration());
-    println!("registered: {}", b);
 }
 
 // pub fn setup_entities(mut commands: Commands, world: &World) {
@@ -159,19 +165,17 @@ pub fn overwrite_value(entities_meta: Vec<EntityMeta>) {
     for e in entities_meta {}
 }
 
-pub fn mutate_entities_data(enity_ref: NonSendMut<EntityMeta>) {
-    
-}
+pub fn mutate_entities_data(enity_ref: NonSendMut<EntityMeta>) {}
 // query: Query<(EntityRef, &ReflectionMarker)>, mut meta: ResMut<EntitiesMeta>
 pub fn parse_world_entities_data(world: &mut World) {
     let mut entities_meta = vec![];
 
     {
-        let mut query = world.query::<(EntityRef, &ReflectionMarker)>();
+        let mut query = world.query::<(EntityRef, Entity, &ReflectionMarker)>();
 
         let type_registry = world.get_resource::<AppTypeRegistry>().unwrap().0.read();
 
-        for (entity, _) in query.iter(&world) {
+        for (entity, e, _) in query.iter(&world) {
             let archetype = entity.archetype();
 
             entities_meta.push(EntityMeta { id: entity.id(), components: vec![] });
@@ -186,13 +190,19 @@ pub fn parse_world_entities_data(world: &mut World) {
                             component_info.layout();
                             let data = entity.get_by_id(component_id).unwrap();
                             let u = [50];
+                            let tuple = parse(reflect_component);
+                            let mut d: Vec<u8> = vec![0; tuple.1];
+
                             unsafe {
                                 std::ptr::copy(u.as_ptr(), data.as_ptr(), 1);
+                                std::ptr::copy_nonoverlapping(data.as_ptr(), d.as_mut_ptr(), d.len());
+
                                 entity_meta.components.push(Component {
                                     name: reflect_component.type_info().type_path_table().short_path().to_owned(), // TODO, can do this
-                                    fields: parse(reflect_component),
+                                    fields: tuple.0,
                                     layout: component_info.layout(),
-                                    data: data.as_ptr(),
+                                    data: d,
+                                    id: component_id,
                                 });
                             }
                         }
@@ -200,12 +210,27 @@ pub fn parse_world_entities_data(world: &mut World) {
                     }
 
                     let component_type_name = component_info.name();
-                    println!("  Component: {}", component_type_name);
                 }
             }
         }
     }
     world.non_send_resource_mut::<EntitiesMeta>().as_mut().data = entities_meta;
+}
+
+pub fn mutate_data(world: &mut World) {
+    let mut entity_meta;
+    {
+        entity_meta = world.non_send_resource_mut::<EntityMeta>().clone();
+    }
+
+    let entity_ref = world.get_entity(entity_meta.id).unwrap();
+
+    for component in &mut entity_meta.components {
+        let data_ptr = entity_ref.get_by_id(component.id).unwrap();
+        unsafe {
+            std::ptr::copy_nonoverlapping(component.data.as_mut_ptr(), data_ptr.as_ptr(), component.layout.size());
+        }
+    }
 }
 
 pub fn write_out_data(query: Query<&Bar>) {
@@ -216,18 +241,22 @@ pub fn write_out_data(query: Query<&Bar>) {
     }
 }
 
-fn parse(generic_component: &TypeRegistration) -> Vec<Field> {
+fn parse(generic_component: &TypeRegistration) -> (Vec<Field>, usize) {
     match generic_component.type_info() {
         bevy_reflect::TypeInfo::Struct(x) => {
             let mut fields = vec![];
-
+            let mut size = 0;
             for i in 0..x.field_len() {
                 let field = x.field_at(i).unwrap().type_path_table();
                 let field_name = x.field_at(i).unwrap().name().to_owned();
                 let field_ident = field.ident().unwrap();
-                fields.push(Field::new(field_name, FieldType::from(field_ident)));
+                let field_type = FieldType::from(field_ident);
+                let field_size = field_type.get_size();
+
+                fields.push(Field::new(field_name, field_type));
+                size += field_size;
             }
-            fields
+            (fields, size)
         }
         bevy_reflect::TypeInfo::TupleStruct(_) => todo!(),
         bevy_reflect::TypeInfo::Tuple(_) => todo!(),

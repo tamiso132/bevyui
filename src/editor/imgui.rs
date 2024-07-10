@@ -88,7 +88,6 @@ impl HierachyWindow {
     }
 }
 
-#[derive(Default)]
 struct InspectorWindow {
     headers: Vec<bool>,
     window: bool,
@@ -111,18 +110,15 @@ impl InspectorWindow {
             numbers: HashMap::new(),
         }
     }
-    fn draw_inspector(&mut self, ui: &mut Ui, hdpi_scale: f32, window_extent: Extent2D, entity: &mut Option<EntityMeta>) {
+    fn draw_inspector(&mut self, ui: &mut Ui, hdpi_scale: f32, window_extent: Extent2D, entity: Option<EntityMeta>) -> &mut Option<EntityMeta> {
         let extent = window_extent;
         let inspector_width = window_extent.width as f32 * 0.5;
 
         let window_width = min(self.max_width as u32, inspector_width as u32) as f32;
-        let pos_x = (window_extent.width as f32) / hdpi_scale;
-        let size = ui.window_content_region_max();
-        println!("Pos X: {:?}\nWindow Size: {}", pos_x, window_width);
         let w = ui
             .window("Inspector")
             .opened(&mut self.window)
-            .position([pos_x - window_width, 0.0], Condition::Always)
+            .position([extent.width as f32 - window_width, 0.0], Condition::Always)
             .size([window_width, extent.height as f32], Condition::Always);
         w.build(|| {
             let c_text = "this is a component";
@@ -130,7 +126,7 @@ impl InspectorWindow {
             if entity.is_some() {
                 self.numbers.clear();
 
-                let entity_meta = entity.as_mut().unwrap();
+                let mut entity_meta = entity.unwrap();
                 let components_max = entity_meta.components.len();
                 if components_max > self.headers.len() {
                     for _ in 0..components_max - self.headers.len() {
@@ -142,10 +138,7 @@ impl InspectorWindow {
                     let component = &mut entity_meta.components[i];
                     ui.text(component.name.clone());
                     unsafe {
-                        let align_offset = component.data.align_offset(component.layout.align());
-                        let mut data_ptr = component.data.add(align_offset);
-                        let u = [150];
-                        copy_nonoverlapping(u.as_ptr(), component.data, 1);
+                        let mut data_ptr = component.data.as_mut_ptr();
 
                         for f in 0..component.fields.len() {
                             let field = &mut component.fields[f];
@@ -156,11 +149,11 @@ impl InspectorWindow {
                                 | reflection::FieldType::U32
                                 | reflection::FieldType::U16
                                 | reflection::FieldType::U8 => {
-                                    // let number = ptr_to_u64(data_ptr, field.type_.get_size());
-                                    // data_ptr = data_ptr.add(field.type_.get_size());
-                                    // self.numbers.insert((i, f), number as i32);
-                                    // let value = self.numbers.get_mut(&(i, f)).unwrap();
-                                    // ui.input_int(field.name.clone(), value).build();
+                                    let number = ptr_to_u64(data_ptr, field.type_.get_size());
+                                    data_ptr = data_ptr.add(field.type_.get_size());
+                                    self.numbers.insert((i, f), number as i32);
+                                    let value = self.numbers.get_mut(&(i, f)).unwrap();
+                                    ui.input_int(field.name.clone(), value).build();
                                 }
                                 reflection::FieldType::ISIZE => todo!(),
                                 reflection::FieldType::I64 => todo!(),
@@ -174,7 +167,7 @@ impl InspectorWindow {
                     ui.spacing();
                 }
 
-                self.active_entity = Some(entity_meta.clone());
+                self.active_entity = Some(entity_meta);
             } else if self.active_entity.is_some() {
                 let entity_meta = &mut self.active_entity.as_mut().unwrap();
                 let components_max = entity_meta.components.len();
@@ -186,10 +179,12 @@ impl InspectorWindow {
 
                 for i in 0..entity_meta.components.len() {
                     let component = &mut entity_meta.components[i];
+                    let mut data_ptr = component.data.as_mut_ptr();
                     ui.text(component.name.clone());
                     unsafe {
                         for f in 0..component.fields.len() {
                             let field = &mut component.fields[f];
+
                             match field.type_ {
                                 reflection::FieldType::Invalid => todo!(),
                                 reflection::FieldType::USIZE
@@ -203,6 +198,10 @@ impl InspectorWindow {
                                     // let text_width = ui.calc_text_size(&field.name);
                                     //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
                                     ui.input_int("u", &mut value).build();
+                                    let val = [value.clone() as u64];
+                                    copy_nonoverlapping(transmute(val.as_ptr()), data_ptr, field.type_.get_size());
+
+                                    data_ptr = data_ptr.add(field.type_.get_size());
                                 }
                                 reflection::FieldType::ISIZE => todo!(),
                                 reflection::FieldType::I64 => todo!(),
@@ -217,6 +216,7 @@ impl InspectorWindow {
                 }
             }
         });
+        &mut self.active_entity
     }
 }
 
@@ -225,7 +225,6 @@ pub struct ImguiApp {
     resize: bool,
     last_frame: Instant,
 
-    pub entities: Vec<EntityMeta>,
     inspector: InspectorWindow,
     hierachy: HierachyWindow,
 
@@ -313,7 +312,6 @@ impl ImguiApp {
             vulkan,
             last_frame: Instant::now(),
             resize: false,
-            entities: vec![],
             inspector: InspectorWindow::new(),
             hierachy: HierachyWindow::new(),
             exit: false,
@@ -358,15 +356,20 @@ impl ImguiApp {
         let mut entity_meta = self
             .hierachy
             .draw_hierachy(&mut ui, self.vulkan.window.scale_factor() as f32, self.vulkan.window_extent, entities);
-        self.inspector
-            .draw_inspector(&mut ui, self.vulkan.window.scale_factor() as f32, self.vulkan.window_extent, &mut entity_meta);
+        let entity_meta = self
+            .inspector
+            .draw_inspector(&mut ui, self.vulkan.window.scale_factor() as f32, self.vulkan.window_extent, entity_meta);
 
         if entity_meta.is_some() {
-            let d = entity_meta.unwrap();
+            let d = entity_meta.as_mut().unwrap();
             entity.deref_mut().id = d.id;
-            entity.deref_mut().components = d.components;
+            entity.deref_mut().components.clear();
+
+            for cmp in d.components.iter() {
+                let deref = entity.deref_mut();
+                deref.components.push(cmp.clone());
+            }
         }
-        ui.show_demo_window(&mut true);
         imgui.render(
             self.vulkan.window_extent,
             &self.vulkan.swapchain.images[self.vulkan.swapchain.image_index as usize],
