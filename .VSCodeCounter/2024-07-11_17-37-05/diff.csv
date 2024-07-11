@@ -1,0 +1,8 @@
+"filename", "language", "Rust", "comment", "blank", "total"
+"/home/tom/projects/bevyui/src/editor/imgui.rs", "Rust", 368, 7, 59, 434
+"/home/tom/projects/bevyui/src/editor/mod.rs", "Rust", -48, 11, -21, -58
+"/home/tom/projects/bevyui/src/editor/reflection.rs", "Rust", 118, -10, 17, 125
+"/home/tom/projects/bevyui/src/main.rs", "Rust", 4, 2, 1, 7
+"/home/tom/projects/bevyui/voxelengine/src/App.rs", "Rust", -1, 0, 0, -1
+"/home/tom/projects/bevyui/voxelengine/src/vulkan/mod.rs", "Rust", -5, 0, 0, -5
+"Total", "-", 436, 10, 56, 502

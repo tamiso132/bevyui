@@ -55,7 +55,7 @@ fn create_event_loop() -> EventLoop<()> {
 fn test_spawn(mut commands: Commands) {
     // commands.spawn((Foo::default(), ReflectionMarker::default()));
     let one = commands.spawn((Foo::default(), ReflectionMarker::default()));
-    let two = commands.spawn((Bar { b: 2, t: 7, bba: 15, l: 10 }, ReflectionMarker::default()));
+    let two = commands.spawn((Bar { b: 2, t: 7, bba: "test_string".to_string(), l: 10 }, ReflectionMarker::default()));
     let x = 5;
 }
 

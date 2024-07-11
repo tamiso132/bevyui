@@ -11,10 +11,12 @@ use std::{
     cmp::{max, min},
     collections::HashMap,
     mem::transmute,
-    ops::{Deref, DerefMut},
+    ops::{Add, Deref, DerefMut},
     ptr::copy_nonoverlapping,
+    str::FromStr,
     sync::Mutex,
     time::{Duration, Instant},
+    u8,
 };
 use voxelengine::{
     vulkan::{util, VulkanContext},
@@ -37,6 +39,43 @@ pub fn ptr_to_u64(src: *const u8, len: usize) -> u64 {
         std::ptr::copy_nonoverlapping(src, buffer.as_mut_ptr(), len);
         transmute(buffer)
     }
+}
+
+pub fn ptr_to_i64(src: *const i8, len: usize) -> i64 {
+    assert!(len <= 8);
+
+    let mut buffer = [0i8; 8];
+
+    unsafe {
+        std::ptr::copy_nonoverlapping(src, buffer.as_mut_ptr(), len);
+        transmute(buffer)
+    }
+}
+
+pub fn ptr_to_string(src: *const u8) -> String {
+    let mut s = String::from_str("hey").unwrap();
+
+    let adress = &mut s;
+    unsafe {
+        copy_nonoverlapping(src, transmute(adress), size_of::<String>());
+    }
+
+    s.push_str("heyo");
+    s
+}
+
+// you can do this, becuase you know the aligment is always a power of two
+/// Returns the aligned ptr and the amount it padded;
+pub fn align_ptr(ptr: *mut u8, aligment: usize) -> *mut u8 {
+    let ptr = ptr as usize;
+    let aligned_ptr = (ptr + aligment - 1) & !(aligment - 1);
+    aligned_ptr as *mut u8
+}
+
+pub fn align_ptr_with_padding_size(ptr: *mut u8, aligment: usize) -> usize {
+    let ptr = ptr as usize;
+    let aligned_ptr = (ptr + aligment - 1) & !(aligment - 1);
+    aligned_ptr - ptr
 }
 
 struct HierachyWindow {
@@ -89,7 +128,6 @@ impl HierachyWindow {
 }
 
 struct InspectorWindow {
-    headers: Vec<bool>,
     window: bool,
     width: f32,
     max_width: f32,
@@ -97,17 +135,20 @@ struct InspectorWindow {
     active_entity: Option<EntityMeta>,
 
     numbers: HashMap<(usize, usize), i32>,
+    texts: HashMap<(usize, usize), String>,
+    v: Vec<i32>,
 }
 
 impl InspectorWindow {
     fn new() -> Self {
         Self {
-            headers: vec![false, true, true, false],
             window: true,
             width: 0.4,
             max_width: 300.0,
             active_entity: None,
             numbers: HashMap::new(),
+            v: vec![50, 20],
+            texts: HashMap::new(),
         }
     }
     fn draw_inspector(&mut self, ui: &mut Ui, hdpi_scale: f32, window_extent: Extent2D, entity: Option<EntityMeta>) -> &mut Option<EntityMeta> {
@@ -121,24 +162,16 @@ impl InspectorWindow {
             .position([extent.width as f32 - window_width, 0.0], Condition::Always)
             .size([window_width, extent.height as f32], Condition::Always);
         w.build(|| {
-            let c_text = "this is a component";
-
             if entity.is_some() {
                 self.numbers.clear();
 
                 let mut entity_meta = entity.unwrap();
-                let components_max = entity_meta.components.len();
-                if components_max > self.headers.len() {
-                    for _ in 0..components_max - self.headers.len() {
-                        self.headers.push(false);
-                    }
-                }
 
                 for i in 0..entity_meta.components.len() {
                     let component = &mut entity_meta.components[i];
                     ui.text(component.name.clone());
                     unsafe {
-                        let mut data_ptr = component.data.as_mut_ptr();
+                        let mut data_ptr = align_ptr(component.data.as_mut_ptr(), component.layout.align());
 
                         for f in 0..component.fields.len() {
                             let field = &mut component.fields[f];
@@ -149,18 +182,36 @@ impl InspectorWindow {
                                 | reflection::FieldType::U32
                                 | reflection::FieldType::U16
                                 | reflection::FieldType::U8 => {
+                                    // pad fields if needed
+                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+
+                                    // add to hashmap
                                     let number = ptr_to_u64(data_ptr, field.type_.get_size());
                                     data_ptr = data_ptr.add(field.type_.get_size());
                                     self.numbers.insert((i, f), number as i32);
-                                    let value = self.numbers.get_mut(&(i, f)).unwrap();
-                                    ui.input_int(field.name.clone(), value).build();
                                 }
-                                reflection::FieldType::ISIZE => todo!(),
-                                reflection::FieldType::I64 => todo!(),
-                                reflection::FieldType::I32 => todo!(),
-                                reflection::FieldType::I16 => todo!(),
-                                reflection::FieldType::I8 => todo!(),
-                                reflection::FieldType::String => todo!(),
+                                reflection::FieldType::ISIZE
+                                | reflection::FieldType::I64
+                                | reflection::FieldType::I32
+                                | reflection::FieldType::I16
+                                | reflection::FieldType::I8 => {
+                                    // pad fields if needed
+                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+
+                                    // add to hashmap
+                                    let number = ptr_to_i64(transmute(data_ptr), field.type_.get_size());
+                                    data_ptr = data_ptr.add(field.type_.get_size());
+                                    self.numbers.insert((i, f), number as i32);
+                                }
+                                reflection::FieldType::String => {
+                                    // pad fields if needed
+                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+
+                                    // add to hashmap
+                                    let text = ptr_to_string(data_ptr);
+                                    data_ptr = data_ptr.add(field.type_.get_size());
+                                    self.texts.insert((i, f), text);
+                                }
                             }
                         }
                     }
@@ -170,17 +221,16 @@ impl InspectorWindow {
                 self.active_entity = Some(entity_meta);
             } else if self.active_entity.is_some() {
                 let entity_meta = &mut self.active_entity.as_mut().unwrap();
-                let components_max = entity_meta.components.len();
-                if components_max > self.headers.len() {
-                    for _ in 0..components_max - self.headers.len() {
-                        self.headers.push(false);
-                    }
-                }
 
+                for v in 0..self.v.len() {
+                    let s = format!("{}", v);
+                    ui.input_int(&s, &mut self.v[v]).build();
+                }
                 for i in 0..entity_meta.components.len() {
                     let component = &mut entity_meta.components[i];
-                    let mut data_ptr = component.data.as_mut_ptr();
+                    let mut data_ptr = align_ptr(component.data.as_mut_ptr(), component.layout.align());
                     ui.text(component.name.clone());
+
                     unsafe {
                         for f in 0..component.fields.len() {
                             let field = &mut component.fields[f];
@@ -192,23 +242,73 @@ impl InspectorWindow {
                                 | reflection::FieldType::U32
                                 | reflection::FieldType::U16
                                 | reflection::FieldType::U8 => {
+                                    // Align the ptr
+                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+
+                                    // Get hashmap value
+                                    let key = (i, f);
+                                    let mut value = self.numbers.get_mut(&key).unwrap();
+
+                                    // create imgui input
+                                    ui.text(field.name.to_string());
+                                    let identifier = ui.push_id(field.name.to_string());
+                                    ui.input_int("##", &mut value).read_only(false).always_overwrite(true).build();
+                                    identifier.end();
+
+                                    // Update the value
+                                    let val = [value.clone() as u64];
+                                    let field_size = field.type_.get_size();
+                                    copy_nonoverlapping(transmute(val.as_ptr()), data_ptr, field_size);
+
+                                    data_ptr = data_ptr.add(field.type_.get_size());
+                                }
+                                reflection::FieldType::ISIZE
+                                | reflection::FieldType::I64
+                                | reflection::FieldType::I32
+                                | reflection::FieldType::I16
+                                | reflection::FieldType::I8 => {
+                                    // Align the ptr
+                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
                                     let key = (i, f);
                                     let mut value = self.numbers.get_mut(&key).unwrap();
                                     ui.text(field.name.to_string());
                                     // let text_width = ui.calc_text_size(&field.name);
                                     //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
-                                    ui.input_int("u", &mut value).build();
-                                    let val = [value.clone() as u64];
-                                    copy_nonoverlapping(transmute(val.as_ptr()), data_ptr, field.type_.get_size());
+                                    let identifier = ui.push_id(field.name.to_string());
+                                    ui.input_int("##", &mut value).read_only(false).always_overwrite(true).build();
+
+                                    // Pad if needed
+
+                                    identifier.end();
+                                    let val = [value.clone() as i64];
+                                    let field_size = field.type_.get_size();
+
+                                    // Pad the val to get the last bytes
+                                    let val_ptr = transmute::<*const i64, *const u8>(val.as_ptr()).add(8 - field_size);
+
+                                    copy_nonoverlapping(val_ptr, data_ptr, field_size);
 
                                     data_ptr = data_ptr.add(field.type_.get_size());
                                 }
-                                reflection::FieldType::ISIZE => todo!(),
-                                reflection::FieldType::I64 => todo!(),
-                                reflection::FieldType::I32 => todo!(),
-                                reflection::FieldType::I16 => todo!(),
-                                reflection::FieldType::I8 => todo!(),
-                                reflection::FieldType::String => todo!(),
+                                reflection::FieldType::String => {
+                                    // Align the ptr
+                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+                                    let key = (i, f);
+                                    let mut value = self.texts.get_mut(&key).unwrap();
+                                    ui.text(field.name.to_string());
+                                    // let text_width = ui.calc_text_size(&field.name);
+                                    //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
+                                    let identifier = ui.push_id(field.name.to_string());
+                                    ui.input_text("##", &mut value).read_only(false).always_overwrite(true).build();
+
+                                    // Pad if needed
+
+                                    identifier.end();
+                                    let val = [value.clone()];
+                                    let field_size = field.type_.get_size();
+                                    copy_nonoverlapping(val.as_ptr(), transmute(data_ptr), field_size);
+                                    data_ptr = data_ptr.add(field.type_.get_size());
+                                }
                             }
                         }
                     }

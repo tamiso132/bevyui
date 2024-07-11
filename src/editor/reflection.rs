@@ -8,6 +8,8 @@ use bevy::{
 };
 use bevy_reflect::{DynamicTypePath, GetTypeRegistration, TypeData, TypeRegistration};
 
+use super::imgui::align_ptr;
+
 #[derive(Reflect, Default, Component)]
 #[reflect(Component)]
 pub struct Foo {
@@ -21,8 +23,8 @@ pub struct Foo {
 #[reflect(Component)]
 pub struct Bar {
     pub b: u8,
-    pub t: u8,
-    pub bba: u8,
+    pub t: u64,
+    pub bba: String,
     pub l: u8,
 }
 
@@ -48,7 +50,8 @@ pub enum FieldType {
     String,
 }
 
-const SIZE_LOOK_UP_TABLE: [usize; 12] = [0, 8, 8, 4, 2, 1, 8, 8, 4, 2, 1, 24];
+const SIZE_LOOK_UP_TABLE: [usize; 12] = [0, 8, 8, 4, 2, 1, 8, 8, 4, 2, 1, size_of::<String>()];
+const ALIGMENT_LOOK_UP_TABLE: [usize; 12] = [0, 8, 8, 4, 2, 1, 8, 8, 4, 2, 1, align_of::<String>()];
 
 impl FieldType {
     /// get the size of the field data in bytes
@@ -57,6 +60,9 @@ impl FieldType {
             let index: u32 = transmute(*self);
             SIZE_LOOK_UP_TABLE[index as usize]
         }
+    }
+    pub fn get_aligment(&self) -> usize {
+        ALIGMENT_LOOK_UP_TABLE[unsafe { transmute::<Self, u32>(*self) as usize }]
     }
 }
 
@@ -80,6 +86,8 @@ impl From<&str> for (FieldType) {
             "i32" => Self::I32,
             "i16" => Self::I16,
             "i8" => Self::I8,
+
+            "String" => Self::String,
 
             _ => Self::Invalid,
         }
@@ -190,12 +198,11 @@ pub fn parse_world_entities_data(world: &mut World) {
                             component_info.layout();
                             let data = entity.get_by_id(component_id).unwrap();
                             let u = [50];
-                            let tuple = parse(reflect_component);
+                            let tuple = parse(reflect_component, data.as_ptr(), component_info.layout().align());
                             let mut d: Vec<u8> = vec![0; tuple.1];
 
                             unsafe {
-                                std::ptr::copy(u.as_ptr(), data.as_ptr(), 1);
-                                std::ptr::copy_nonoverlapping(data.as_ptr(), d.as_mut_ptr(), d.len());
+                                std::ptr::copy_nonoverlapping(data.as_ptr(), d.as_mut_ptr(), tuple.1);
 
                                 entity_meta.components.push(Component {
                                     name: reflect_component.type_info().type_path_table().short_path().to_owned(), // TODO, can do this
@@ -241,22 +248,26 @@ pub fn write_out_data(query: Query<&Bar>) {
     }
 }
 
-fn parse(generic_component: &TypeRegistration) -> (Vec<Field>, usize) {
+fn parse(generic_component: &TypeRegistration, data_ptr: *mut u8, alignment: usize) -> (Vec<Field>, usize) {
+    let mut new_ptr = align_ptr(data_ptr, alignment);
+
     match generic_component.type_info() {
         bevy_reflect::TypeInfo::Struct(x) => {
             let mut fields = vec![];
-            let mut size = 0;
             for i in 0..x.field_len() {
                 let field = x.field_at(i).unwrap().type_path_table();
                 let field_name = x.field_at(i).unwrap().name().to_owned();
                 let field_ident = field.ident().unwrap();
                 let field_type = FieldType::from(field_ident);
-                let field_size = field_type.get_size();
 
+                // add offset of field
+                new_ptr = align_ptr(new_ptr, field_type.get_aligment());
+                unsafe {
+                    new_ptr = new_ptr.add(field_type.get_size());
+                }
                 fields.push(Field::new(field_name, field_type));
-                size += field_size;
             }
-            (fields, size)
+            (fields, new_ptr as usize - data_ptr as usize)
         }
         bevy_reflect::TypeInfo::TupleStruct(_) => todo!(),
         bevy_reflect::TypeInfo::Tuple(_) => todo!(),

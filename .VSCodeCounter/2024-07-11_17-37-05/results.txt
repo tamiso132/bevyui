@@ -1,0 +1,57 @@
+Date : 2024-07-11 17:37:05
+Directory : /home/tom/projects/bevyui
+Total : 21 files,  5493 codes, 246 comments, 1088 blanks, all 6827 lines
+
+Languages
++--------------+------------+------------+------------+------------+------------+
+| language     | files      | code       | comment    | blank      | total      |
++--------------+------------+------------+------------+------------+------------+
+| Rust         |         20 |      5,484 |        242 |      1,084 |      6,810 |
+| Shell Script |          1 |          9 |          4 |          4 |         17 |
++--------------+------------+------------+------------+------------+------------+
+
+Directories
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                         | files      | code       | comment    | blank      | total      |
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                            |         21 |      5,493 |        246 |      1,088 |      6,827 |
+| . (Files)                                                    |          2 |         14 |          7 |          8 |         29 |
+| src                                                          |          4 |        693 |         32 |        117 |        842 |
+| src (Files)                                                  |          1 |         41 |          3 |          8 |         52 |
+| src/editor                                                   |          3 |        652 |         29 |        109 |        790 |
+| voxelengine                                                  |         15 |      4,786 |        207 |        963 |      5,956 |
+| voxelengine/src                                              |         15 |      4,786 |        207 |        963 |      5,956 |
+| voxelengine/src (Files)                                      |          2 |        104 |          2 |         26 |        132 |
+| voxelengine/src/core                                         |          2 |        225 |         25 |         65 |        315 |
+| voxelengine/src/physics                                      |          1 |         14 |          0 |          4 |         18 |
+| voxelengine/src/terrain                                      |          3 |        973 |         96 |        241 |      1,310 |
+| voxelengine/src/vulkan                                       |          7 |      3,470 |         84 |        627 |      4,181 |
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++--------------------------------------------------------------+--------------+------------+------------+------------+------------+
+| filename                                                     | language     | code       | comment    | blank      | total      |
++--------------------------------------------------------------+--------------+------------+------------+------------+------------+
+| /home/tom/projects/bevyui/build.rs                           | Rust         |          5 |          3 |          4 |         12 |
+| /home/tom/projects/bevyui/build_shader.sh                    | Shell Script |          9 |          4 |          4 |         17 |
+| /home/tom/projects/bevyui/src/editor/imgui.rs                | Rust         |        368 |          7 |         59 |        434 |
+| /home/tom/projects/bevyui/src/editor/mod.rs                  | Rust         |         62 |         12 |         12 |         86 |
+| /home/tom/projects/bevyui/src/editor/reflection.rs           | Rust         |        222 |         10 |         38 |        270 |
+| /home/tom/projects/bevyui/src/main.rs                        | Rust         |         41 |          3 |          8 |         52 |
+| /home/tom/projects/bevyui/voxelengine/src/App.rs             | Rust         |         85 |          2 |         20 |        107 |
+| /home/tom/projects/bevyui/voxelengine/src/core/camera.rs     | Rust         |        224 |         25 |         64 |        313 |
+| /home/tom/projects/bevyui/voxelengine/src/core/mod.rs        | Rust         |          1 |          0 |          1 |          2 |
+| /home/tom/projects/bevyui/voxelengine/src/lib.rs             | Rust         |         19 |          0 |          6 |         25 |
+| /home/tom/projects/bevyui/voxelengine/src/physics/mod.rs     | Rust         |         14 |          0 |          4 |         18 |
+| /home/tom/projects/bevyui/voxelengine/src/terrain/block.rs   | Rust         |        102 |          3 |         27 |        132 |
+| /home/tom/projects/bevyui/voxelengine/src/terrain/mod.rs     | Rust         |        697 |         70 |        172 |        939 |
+| /home/tom/projects/bevyui/voxelengine/src/terrain/octree.rs  | Rust         |        174 |         23 |         42 |        239 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/builder.rs  | Rust         |        613 |         14 |        131 |        758 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/init.rs     | Rust         |        154 |          0 |         21 |        175 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/loader.rs   | Rust         |        125 |         15 |         20 |        160 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/mesh.rs     | Rust         |        494 |          6 |         34 |        534 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/mod.rs      | Rust         |        653 |          9 |        153 |        815 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/resource.rs | Rust         |        916 |         34 |        156 |      1,106 |
+| /home/tom/projects/bevyui/voxelengine/src/vulkan/util.rs     | Rust         |        515 |          6 |        112 |        633 |
+| Total                                                        |              |      5,493 |        246 |      1,088 |      6,827 |
++--------------------------------------------------------------+--------------+------------+------------+------------+------------+
