@@ -10,7 +10,7 @@ use reflection::{EntitiesMeta, EntityMeta, Foo, ReflectionMarker};
 use std::{
     cmp::{max, min},
     collections::HashMap,
-    mem::transmute,
+    mem::{transmute, ManuallyDrop},
     ops::{Add, Deref, DerefMut},
     ptr::copy_nonoverlapping,
     str::FromStr,
@@ -23,6 +23,7 @@ use voxelengine::{
     App::ApplicationTrait,
 };
 use winit::{
+    dpi::Pixel,
     event::{self, Event, WindowEvent},
     event_loop::{EventLoop, EventLoopWindowTarget},
     platform::{pump_events::EventLoopExtPumpEvents, run_on_demand::EventLoopExtRunOnDemand},
@@ -52,15 +53,8 @@ pub fn ptr_to_i64(src: *const i8, len: usize) -> i64 {
     }
 }
 
-pub fn ptr_to_string(src: *const u8) -> String {
-    let mut s = String::from_str("hey").unwrap();
-
-    let adress = &mut s;
-    unsafe {
-        copy_nonoverlapping(src, transmute(adress), size_of::<String>());
-    }
-
-    s.push_str("heyo");
+pub fn ptr_to_string(src: *const u8) -> ManuallyDrop<String> {
+    let mut s = unsafe { ManuallyDrop::new((src as *const String).read()) };
     s
 }
 
@@ -210,7 +204,7 @@ impl InspectorWindow {
                                     // add to hashmap
                                     let text = ptr_to_string(data_ptr);
                                     data_ptr = data_ptr.add(field.type_.get_size());
-                                    self.texts.insert((i, f), text);
+                                    self.texts.insert((i, f), text.to_string().clone());
                                 }
                             }
                         }
@@ -247,18 +241,19 @@ impl InspectorWindow {
 
                                     // Get hashmap value
                                     let key = (i, f);
-                                    let mut value = self.numbers.get_mut(&key).unwrap();
+                                    let mut val = self.numbers.get_mut(&key).unwrap();
 
                                     // create imgui input
                                     ui.text(field.name.to_string());
                                     let identifier = ui.push_id(field.name.to_string());
-                                    ui.input_int("##", &mut value).read_only(false).always_overwrite(true).build();
+                                    ui.input_int("##", &mut val).read_only(false).always_overwrite(true).build();
                                     identifier.end();
 
                                     // Update the value
-                                    let val = [value.clone() as u64];
+                                    let mut v = val.clone() as u64;
+                                    let val_ptr = (&mut v as *mut u64) as *mut u8;
                                     let field_size = field.type_.get_size();
-                                    copy_nonoverlapping(transmute(val.as_ptr()), data_ptr, field_size);
+                                    copy_nonoverlapping(val_ptr, data_ptr, field_size);
 
                                     data_ptr = data_ptr.add(field.type_.get_size());
                                 }
@@ -280,11 +275,10 @@ impl InspectorWindow {
                                     // Pad if needed
 
                                     identifier.end();
-                                    let val = [value.clone() as i64];
+                                    let mut val = [value.clone() as i64];
                                     let field_size = field.type_.get_size();
-
+                                    let val_ptr = ((&mut val as *mut i64) as *mut u8).add(8 - field_size);
                                     // Pad the val to get the last bytes
-                                    let val_ptr = transmute::<*const i64, *const u8>(val.as_ptr()).add(8 - field_size);
 
                                     copy_nonoverlapping(val_ptr, data_ptr, field_size);
 
@@ -296,17 +290,19 @@ impl InspectorWindow {
                                     let key = (i, f);
                                     let mut value = self.texts.get_mut(&key).unwrap();
                                     ui.text(field.name.to_string());
+                                    //  let mut string = ptr_to_string(data_ptr);
+                                    let mut ss = "ghggggggggggggggggggggggggggggggggggggg".to_string();
                                     // let text_width = ui.calc_text_size(&field.name);
                                     //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
+                                    //copy_nonoverlapping((&mut ss as *mut String).cast(), (&mut string as *mut ManuallyDrop<String>), 1);
                                     let identifier = ui.push_id(field.name.to_string());
                                     ui.input_text("##", &mut value).read_only(false).always_overwrite(true).build();
 
                                     // Pad if needed
-
+                                    let next = ((value) as *mut String).cast::<u8>();
                                     identifier.end();
-                                    let val = [value.clone()];
-                                    let field_size = field.type_.get_size();
-                                    copy_nonoverlapping(val.as_ptr(), transmute(data_ptr), field_size);
+                                    copy_nonoverlapping(next, data_ptr, 24);
+
                                     data_ptr = data_ptr.add(field.type_.get_size());
                                 }
                             }

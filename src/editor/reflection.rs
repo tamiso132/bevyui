@@ -22,9 +22,9 @@ pub struct Foo {
 #[derive(Component, Reflect, Debug, Default)]
 #[reflect(Component)]
 pub struct Bar {
+    pub bba: String,
     pub b: u8,
     pub t: u64,
-    pub bba: String,
     pub l: u8,
 }
 
@@ -121,7 +121,7 @@ impl Component {
             fields.push(self.fields[i].clone());
         }
 
-        Self { name: self.name.clone(), layout: self.layout, fields, data: self.data.clone(), id: self.id }
+        Self { name: self.name.clone(), layout: self.layout.clone(), fields, data: self.data.clone(), id: self.id }
     }
 }
 #[repr(C)]
@@ -197,7 +197,6 @@ pub fn parse_world_entities_data(world: &mut World) {
                         Some(reflect_component) => {
                             component_info.layout();
                             let data = entity.get_by_id(component_id).unwrap();
-                            let u = [50];
                             let tuple = parse(reflect_component, data.as_ptr(), component_info.layout().align());
                             let mut d: Vec<u8> = vec![0; tuple.1];
 
@@ -215,8 +214,6 @@ pub fn parse_world_entities_data(world: &mut World) {
                         }
                         None => {}
                     }
-
-                    let component_type_name = component_info.name();
                 }
             }
         }
@@ -233,9 +230,10 @@ pub fn mutate_data(world: &mut World) {
     let entity_ref = world.get_entity(entity_meta.id).unwrap();
 
     for component in &mut entity_meta.components {
-        let data_ptr = entity_ref.get_by_id(component.id).unwrap();
+        let mut data_ptr = entity_ref.get_by_id(component.id).unwrap();
+        let ptr = align_ptr(data_ptr.as_ptr(), component.layout.align());
         unsafe {
-            std::ptr::copy_nonoverlapping(component.data.as_mut_ptr(), data_ptr.as_ptr(), component.layout.size());
+            std::ptr::copy_nonoverlapping(component.data.as_mut_ptr(), ptr, component.layout.size());
         }
     }
 }
