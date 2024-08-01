@@ -177,24 +177,24 @@ pub fn mutate_entities_data(enity_ref: NonSendMut<EntityMeta>) {}
 // query: Query<(EntityRef, &ReflectionMarker)>, mut meta: ResMut<EntitiesMeta>
 pub fn parse_world_entities_data(world: &mut World) {
     let mut entities_meta = vec![];
-
     {
+        let func = setup_reflection.into_system_set();
         let mut query = world.query::<(EntityRef, Entity, &ReflectionMarker)>();
 
         let type_registry = world.get_resource::<AppTypeRegistry>().unwrap().0.read();
-
         for (entity, e, _) in query.iter(&world) {
             let archetype = entity.archetype();
 
             entities_meta.push(EntityMeta { id: entity.id(), components: vec![] });
             let last_index = entities_meta.len() - 1;
             let entity_meta = &mut entities_meta[last_index];
-
             for component_id in archetype.components() {
                 if let Some(component_info) = world.components().get_info(component_id) {
                     let is_reflect = type_registry.get(component_info.type_id().unwrap());
                     match is_reflect {
                         Some(reflect_component) => {
+                            let u = reflect_component.clone();
+
                             component_info.layout();
                             let data = entity.get_by_id(component_id).unwrap();
                             let tuple = parse(reflect_component, data.as_ptr(), component_info.layout().align());

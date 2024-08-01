@@ -46,9 +46,9 @@ fn startup(mut r: ResMut<bevy_framepace::FramepaceSettings>) {
 fn main() {
     let mut app = App::new();
     game::setup_game_systmes(&mut app);
-    // app.add_plugins((DefaultPlugins, EditorPlugin, bevy_framepace::FramepacePlugin))
-    //     .add_systems(Startup, (startup))
-    //     .run();
+    app.add_plugins((DefaultPlugins, EditorPlugin, bevy_framepace::FramepacePlugin))
+        .add_systems(Startup, (startup))
+        .run();
 
-    app.add_plugins(DefaultPlugins).run();
+    // app.add_plugins(DefaultPlugins).run();
 }
