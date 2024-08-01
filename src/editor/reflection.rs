@@ -230,7 +230,7 @@ pub fn mutate_data(world: &mut World) {
     let entity_ref = world.get_entity(entity_meta.id).unwrap();
 
     for component in &mut entity_meta.components {
-        let mut data_ptr = entity_ref.get_by_id(component.id).unwrap();
+        let data_ptr = entity_ref.get_by_id(component.id).unwrap();
         let ptr = align_ptr(data_ptr.as_ptr(), component.layout.align());
         unsafe {
             std::ptr::copy_nonoverlapping(component.data.as_mut_ptr(), ptr, component.layout.size());
@@ -257,6 +257,7 @@ fn parse(generic_component: &TypeRegistration, data_ptr: *mut u8, alignment: usi
                 let field_name = x.field_at(i).unwrap().name().to_owned();
                 let field_ident = field.ident().unwrap();
                 let field_type = FieldType::from(field_ident);
+                
 
                 // add offset of field
                 new_ptr = align_ptr(new_ptr, field_type.get_aligment());

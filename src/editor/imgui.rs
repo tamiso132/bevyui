@@ -18,10 +18,7 @@ use std::{
     time::{Duration, Instant},
     u8,
 };
-use voxelengine::{
-    vulkan::{util, VulkanContext},
-    App::ApplicationTrait,
-};
+use voxelengine::vulkan::{util, VulkanContext};
 use winit::{
     dpi::Pixel,
     event::{self, Event, WindowEvent},
@@ -470,7 +467,7 @@ impl ImguiApp {
             self.vulkan.window_extent,
             &self.vulkan.swapchain.images[self.vulkan.swapchain.image_index as usize],
             self.vulkan.current_frame,
-            &mut self.vulkan.resources,
+            &mut self.vulkan.resources.get_buffer_storage(),
             cmd,
             set,
         );

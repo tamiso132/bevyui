@@ -2511,19 +2511,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "imgui-rs-vulkan-renderer"
-version = "1.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e7a176ce601d47f8ea265a1a26c9dfe1772b08d5d75a2521a1902c0a6586dbe"
-dependencies = [
- "ash 0.37.3+1.3.251",
- "imgui",
- "log",
- "thiserror",
- "ultraviolet",
-]
-
-[[package]]
 name = "imgui-sys"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4581,7 +4568,6 @@ dependencies = [
  "env_logger",
  "image",
  "imgui",
- "imgui-rs-vulkan-renderer",
  "imgui-winit-support",
  "libnoise",
  "log",

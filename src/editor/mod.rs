@@ -13,10 +13,7 @@ use bevy::{
 };
 use imgui::ImguiApp;
 use reflection::{Bar, EntitiesMeta, EntityMeta, Foo, ReflectionMarker};
-use voxelengine::{
-    vulkan::{util, VulkanContext},
-    App::ApplicationTrait,
-};
+use voxelengine::vulkan::{util, VulkanContext};
 use winit::event_loop::{self, EventLoop};
 
 mod imgui;
