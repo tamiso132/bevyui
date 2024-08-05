@@ -1,12 +1,10 @@
 use std::{alloc::Layout, any::Any, mem::transmute};
 
 use bevy::{
-    a11y::accesskit::Invalid,
     ecs::{component::ComponentId, observer::TriggerTargets},
-    log::tracing_subscriber::field,
     prelude::*,
 };
-use bevy_reflect::{DynamicTypePath, GetTypeRegistration, TypeData, TypeRegistration};
+use bevy_reflect::{GetTypeRegistration, TypeRegistration};
 
 use super::imgui::align_ptr;
 
@@ -72,7 +70,7 @@ impl Default for FieldType {
     }
 }
 
-impl From<&str> for (FieldType) {
+impl From<&str> for FieldType {
     fn from(value: &str) -> Self {
         match value {
             "usize" => Self::USIZE,

@@ -1,19 +1,10 @@
-use std::{
-    cmp::{max, min},
-    time::{Duration, Instant},
-};
 
-use ash::{
-    valve::mutable_descriptor_type,
-    vk::{self, Extent2D},
-};
 use bevy::{
     app::{Plugin, Startup, Update},
-    prelude::{Commands, IntoSystemConfigs, NonSendMut, Res},
+    prelude::{Commands, IntoSystemConfigs, NonSendMut},
 };
 use imgui::ImguiApp;
 use reflection::{Bar, EntitiesMeta, EntityMeta, Foo, ReflectionMarker};
-use voxelengine::vulkan::{util, VulkanContext};
 use winit::event_loop::{self, EventLoop};
 
 mod imgui;

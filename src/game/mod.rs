@@ -1,12 +1,11 @@
 use bevy::{
     app::{App, Startup, Update},
     asset::{AssetServer, Assets},
-    color::{ColorToComponents, LinearRgba},
     input::ButtonInput,
     math::Vec3,
-    prelude::{Camera2dBundle, Commands, Component, KeyCode, Query, Rectangle, Res, ResMut, With},
+    prelude::{Camera2dBundle, Commands, Component, KeyCode, Query, Res, ResMut, With},
     render::mesh::Mesh,
-    sprite::{ColorMaterial, MaterialMesh2dBundle, Mesh2dHandle, SpriteBundle},
+    sprite::{ColorMaterial, SpriteBundle},
     time::Time,
     transform::components::Transform,
     utils::default,
@@ -34,8 +33,8 @@ enum Direction {
 
 fn setup_game(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<ColorMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
     // Load the Bevy logo as a texture
