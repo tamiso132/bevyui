@@ -20,10 +20,7 @@ use bevy_framepace::Limiter;
 use bevy_reflect::{Reflect, TypeRegistration};
 use bevy_winit::WinitPlugin;
 use editor::EditorPlugin;
-use winit::{
-    event_loop::{self, EventLoop, EventLoopBuilder},
-    platform::x11::EventLoopBuilderExtX11,
-};
+use winit::event_loop::{self, EventLoop, EventLoopBuilder};
 
 #[derive(Reflect, Component)]
 struct Position {

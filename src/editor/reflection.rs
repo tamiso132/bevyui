@@ -1,4 +1,4 @@
-use std::{alloc::Layout, any::Any, borrow::BorrowMut, mem::transmute, ptr::copy_nonoverlapping};
+use std::{alloc::Layout, any::Any, mem::transmute};
 
 use bevy::{
     a11y::accesskit::Invalid,
@@ -178,7 +178,6 @@ pub fn mutate_entities_data(enity_ref: NonSendMut<EntityMeta>) {}
 pub fn parse_world_entities_data(world: &mut World) {
     let mut entities_meta = vec![];
     {
-        let func = setup_reflection.into_system_set();
         let mut query = world.query::<(EntityRef, Entity, &ReflectionMarker)>();
 
         let type_registry = world.get_resource::<AppTypeRegistry>().unwrap().0.read();
@@ -257,7 +256,6 @@ fn parse(generic_component: &TypeRegistration, data_ptr: *mut u8, alignment: usi
                 let field_name = x.field_at(i).unwrap().name().to_owned();
                 let field_ident = field.ident().unwrap();
                 let field_type = FieldType::from(field_ident);
-                
 
                 // add offset of field
                 new_ptr = align_ptr(new_ptr, field_type.get_aligment());
