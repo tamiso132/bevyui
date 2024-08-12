@@ -1,9 +1,4 @@
 #![feature(vec_into_raw_parts)]
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
 
 use bevy::{
     app::{App, Plugin, Startup, Update},

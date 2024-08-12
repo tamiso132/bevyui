@@ -6,7 +6,7 @@ use bevy::{
     math::{Vec2, Vec3, VectorSpace},
     prelude::{Camera2dBundle, Commands, Component, IntoSystemConfigs, KeyCode, Query, Rectangle, Res, ResMut, With},
     render::mesh::Mesh,
-    sprite::{ColorMaterial, MaterialMesh2dBundle, Mesh2dHandle, SpriteBundle},
+    sprite::{ColorMaterial, SpriteBundle},
     time::Time,
     transform::components::Transform,
     utils::default,

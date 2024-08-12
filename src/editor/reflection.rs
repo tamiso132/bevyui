@@ -1,7 +1,5 @@
 use bevy::{
-    a11y::accesskit::Invalid,
     ecs::{component::ComponentId, observer::TriggerTargets},
-    log::tracing_subscriber::field,
     prelude::*,
     ptr::Ptr,
 };
@@ -124,7 +122,7 @@ impl Default for FieldType {
     }
 }
 
-impl From<&str> for (FieldType) {
+impl From<&str> for FieldType {
     fn from(value: &str) -> Self {
         match value {
             "usize" => Self::USIZE,
@@ -256,7 +254,6 @@ pub fn ignore(name: &str) -> bool {
 pub fn parse_world_entities_data(world: &mut World) {
     let mut entities_meta = vec![];
     {
-        let func = setup_reflection.into_system_set();
         let mut query = world.query::<(EntityRef, Entity, &ReflectionMarker)>();
 
         let type_registry = world.get_resource::<AppTypeRegistry>().unwrap().0.read();

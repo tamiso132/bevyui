@@ -1,20 +1,18 @@
 use ash::vk::{self, Extent2D};
 use bevy::{
-    app::{Plugin, Startup, Update},
-    prelude::{Commands, Entity, NonSendMut, Res},
+    app::Plugin,
+    prelude::NonSendMut,
 };
 use imgui::{Condition, Ui};
 use lazy_static::lazy_static;
 use once_cell::unsync::Lazy;
 use reflection::{EntitiesMeta, EntityMeta, Foo};
 use std::{
-    cmp::{max, min},
+    cmp::min,
     collections::HashMap,
     mem::{transmute, ManuallyDrop},
-    ops::{Add, Deref, DerefMut},
+    ops::{Add, DerefMut},
     ptr::copy_nonoverlapping,
-    str::FromStr,
-    sync::Mutex,
     time::{Duration, Instant},
     u8,
 };
@@ -26,7 +24,7 @@ use winit::{
     platform::{pump_events::EventLoopExtPumpEvents, run_on_demand::EventLoopExtRunOnDemand},
 };
 
-use super::reflection::{self, FieldType};
+use super::reflection::{self};
 
 pub fn ptr_to_u64(src: *const u8, len: usize) -> u64 {
     assert!(len <= 8);
@@ -51,7 +49,7 @@ pub fn ptr_to_i64(src: *const i8, len: usize) -> i64 {
 }
 
 pub fn ptr_to_string(src: *const u8) -> ManuallyDrop<String> {
-    let mut s = unsafe { ManuallyDrop::new((src as *const String).read()) };
+    let s = unsafe { ManuallyDrop::new((src as *const String).read()) };
     s
 }
 
@@ -370,7 +368,7 @@ impl ImguiApp {
         event: Event<()>,
         _control_flow: &EventLoopWindowTarget<()>,
         entities_meta: &mut NonSendMut<EntitiesMeta>,
-        mut entity: &mut NonSendMut<EntityMeta>,
+        entity: &mut NonSendMut<EntityMeta>,
     ) {
         self.on_new_frame(&event);
 
@@ -462,7 +460,7 @@ impl ImguiApp {
         let imgui = self.vulkan.imgui.as_mut().unwrap();
         let mut ui = imgui.get_draw_instance(&self.vulkan.window);
 
-        let mut entity_meta = self
+        let entity_meta = self
             .hierachy
             .draw_hierachy(&mut ui, self.vulkan.window.scale_factor() as f32, self.vulkan.window_extent, entities);
         let entity_meta = self
