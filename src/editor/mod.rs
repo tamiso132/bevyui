@@ -1,7 +1,10 @@
 use std::{
     cmp::{max, min},
+    ops::Deref,
     time::{Duration, Instant},
 };
+
+pub mod event;
 
 use ash::{
     valve::mutable_descriptor_type,
@@ -9,15 +12,23 @@ use ash::{
 };
 use bevy::{
     app::{Plugin, Startup, Update},
-    prelude::{Commands, IntoSystemConfigs, NonSendMut, Res},
+    prelude::*,
 };
+use bevy_winit::WinitWindows;
 use imgui::ImguiApp;
-use reflection::{Bar, EntitiesMeta, EntityMeta, Foo, ReflectionMarker};
+use reflection::{Bar, EntitiesMeta, EntityMeta, Foo};
 use voxelengine::vulkan::{util, VulkanContext};
-use winit::event_loop::{self, EventLoop};
+use winit::{
+    event_loop::{self, EventLoop},
+    raw_window_handle::HasWindowHandle,
+};
 
 mod imgui;
 mod reflection;
+mod structs;
+
+#[derive(Component, Default)]
+pub struct ReflectionMarker;
 
 pub struct EditorPlugin;
 
@@ -51,23 +62,26 @@ fn create_event_loop() -> EventLoop<()> {
 
 fn test_spawn(mut commands: Commands) {
     // commands.spawn((Foo::default(), ReflectionMarker::default()));
-    let one = commands.spawn((Foo::default(), ReflectionMarker::default()));
+    let one = commands.spawn((Foo::default(), ReflectionMarker::default(), Transform::default()));
     let two = commands.spawn((Bar { b: 2, t: 7, bba: "test_string".to_string(), l: 10 }, ReflectionMarker::default()));
     let x = 5;
 }
 
+fn setup(world: &mut World) {
+    let event_loop = create_event_loop();
+    event_loop.set_control_flow(event_loop::ControlFlow::Wait);
+
+    let imgui_app = ImguiApp::on_new(&event_loop);
+
+    world.insert_non_send_resource(imgui_app);
+    world.insert_non_send_resource(reflection::EntitiesMeta { data: vec![] });
+    world.insert_non_send_resource(EntityMeta::default());
+    world.insert_non_send_resource(event_loop);
+}
+
 impl Plugin for EditorPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        let event_loop = create_event_loop();
-        event_loop.set_control_flow(event_loop::ControlFlow::Wait);
-        let imgui_app = ImguiApp::on_new(&event_loop);
-
-        app.insert_non_send_resource(imgui_app);
-        app.insert_non_send_resource(reflection::EntitiesMeta { data: vec![] });
-        app.insert_non_send_resource(EntityMeta::default());
-        app.insert_non_send_resource(event_loop);
-
-        app.add_systems(Startup, (test_spawn, reflection::setup_reflection).chain());
+        app.add_systems(Startup, (setup, test_spawn, reflection::setup_reflection).chain());
         app.add_systems(
             Update,
             (

@@ -6,7 +6,7 @@ use bevy::{
 use imgui::{Condition, Ui};
 use lazy_static::lazy_static;
 use once_cell::unsync::Lazy;
-use reflection::{EntitiesMeta, EntityMeta, Foo, ReflectionMarker};
+use reflection::{EntitiesMeta, EntityMeta, Foo};
 use std::{
     cmp::{max, min},
     collections::HashMap,
@@ -60,6 +60,9 @@ pub fn ptr_to_string(src: *const u8) -> ManuallyDrop<String> {
 pub fn align_ptr(ptr: *mut u8, aligment: usize) -> *mut u8 {
     let ptr = ptr as usize;
     let aligned_ptr = (ptr + aligment - 1) & !(aligment - 1);
+
+    assert!(aligned_ptr == ptr);
+
     aligned_ptr as *mut u8
 }
 
@@ -110,7 +113,7 @@ impl HierachyWindow {
                 }
                 ui.spacing();
             }
-            if index > 0 {
+            if index >= 0 {
                 entity_pressed = Some(entities.data[index as usize].clone());
             }
         });
@@ -147,168 +150,181 @@ impl InspectorWindow {
         let inspector_width = window_extent.width as f32 * 0.5;
 
         let window_width = min(self.max_width as u32, inspector_width as u32) as f32;
-        let w = ui
-            .window("Inspector")
+
+        // Get a raw pointer to the original `Ui`
+        let ui_ptr: *mut Ui = ui as *mut Ui;
+
+        ui.window("inspector")
             .opened(&mut self.window)
             .position([extent.width as f32 - window_width, 0.0], Condition::Always)
-            .size([window_width, extent.height as f32], Condition::Always);
-        w.build(|| {
-            if entity.is_some() {
-                self.numbers.clear();
+            .size([window_width, extent.height as f32], Condition::Always)
+            .build(|| {
+                if entity.is_some() {
+                    self.numbers.clear();
+                    let mut entity_meta = entity.unwrap();
 
-                let mut entity_meta = entity.unwrap();
+                    for i in 0..entity_meta.components.len() {
+                        let component = &mut entity_meta.components[i];
+                        component.reflect.display_imgui(&mut component.data, ui_ptr);
+                        // component.reflect.display_imgui(&mut component.data, ui_ptr);
+                        //
+                        //    ui.text(component.name.clone());
+                        // component.reflect.display_imgui(&mut component.data, ui);
+                        // unsafe {
+                        //     //let mut data_ptr = align_ptr(component.data.as_mut_ptr(), component.layout.align());
 
-                for i in 0..entity_meta.components.len() {
-                    let component = &mut entity_meta.components[i];
-                    ui.text(component.name.clone());
-                    unsafe {
-                        let mut data_ptr = align_ptr(component.data.as_mut_ptr(), component.layout.align());
+                        //     // for f in 0..component.fields.len() {
+                        //     //     let field = &mut component.fields[f];
+                        //     //     match field.type_ {
+                        //     //         reflection::FieldType::Invalid => todo!(),
+                        //     //         reflection::FieldType::USIZE
+                        //     //         | reflection::FieldType::U64
+                        //     //         | reflection::FieldType::U32
+                        //     //         | reflection::FieldType::U16
+                        //     //         | reflection::FieldType::U8 => {
+                        //     //             // pad fields if needed
+                        //     //             data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
 
-                        for f in 0..component.fields.len() {
-                            let field = &mut component.fields[f];
-                            match field.type_ {
-                                reflection::FieldType::Invalid => todo!(),
-                                reflection::FieldType::USIZE
-                                | reflection::FieldType::U64
-                                | reflection::FieldType::U32
-                                | reflection::FieldType::U16
-                                | reflection::FieldType::U8 => {
-                                    // pad fields if needed
-                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+                        //     //             // add to hashmap
+                        //     //             let number = ptr_to_u64(data_ptr, field.type_.get_size());
+                        //     //             data_ptr = data_ptr.add(field.type_.get_size());
+                        //     //             self.numbers.insert((i, f), number as i32);
+                        //     //         }
+                        //     //         reflection::FieldType::ISIZE
+                        //     //         | reflection::FieldType::I64
+                        //     //         | reflection::FieldType::I32
+                        //     //         | reflection::FieldType::I16
+                        //     //         | reflection::FieldType::I8 => {
+                        //     //             // pad fields if needed
+                        //     //             data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
 
-                                    // add to hashmap
-                                    let number = ptr_to_u64(data_ptr, field.type_.get_size());
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                    self.numbers.insert((i, f), number as i32);
-                                }
-                                reflection::FieldType::ISIZE
-                                | reflection::FieldType::I64
-                                | reflection::FieldType::I32
-                                | reflection::FieldType::I16
-                                | reflection::FieldType::I8 => {
-                                    // pad fields if needed
-                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+                        //     //             // add to hashmap
+                        //     //             let number = ptr_to_i64(transmute(data_ptr), field.type_.get_size());
+                        //     //             data_ptr = data_ptr.add(field.type_.get_size());
+                        //     //             self.numbers.insert((i, f), number as i32);
+                        //     //         }
+                        //     //         reflection::FieldType::String => {
+                        //     //             // pad fields if needed
+                        //     //             data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
 
-                                    // add to hashmap
-                                    let number = ptr_to_i64(transmute(data_ptr), field.type_.get_size());
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                    self.numbers.insert((i, f), number as i32);
-                                }
-                                reflection::FieldType::String => {
-                                    // pad fields if needed
-                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
-
-                                    // add to hashmap
-                                    let text = ptr_to_string(data_ptr);
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                    self.texts.insert((i, f), text.to_string().clone());
-                                }
-                            }
-                        }
+                        //     //             // add to hashmap
+                        //     //             let text = ptr_to_string(data_ptr);
+                        //     //             data_ptr = data_ptr.add(field.type_.get_size());
+                        //     //             self.texts.insert((i, f), text.to_string().clone());
+                        //     //         }
+                        //     //     }
+                        //     // }
+                        // }
+                        //  ui.spacing();
                     }
-                    ui.spacing();
-                }
 
-                self.active_entity = Some(entity_meta);
-            } else if self.active_entity.is_some() {
-                let entity_meta = &mut self.active_entity.as_mut().unwrap();
+                    self.active_entity = Some(entity_meta);
+                } else if self.active_entity.is_some() {
+                    let entity_meta = &mut self.active_entity.as_mut().unwrap();
 
-                for v in 0..self.v.len() {
-                    let s = format!("{}", v);
-                    ui.input_int(&s, &mut self.v[v]).build();
-                }
-                for i in 0..entity_meta.components.len() {
-                    let component = &mut entity_meta.components[i];
-                    let mut data_ptr = align_ptr(component.data.as_mut_ptr(), component.layout.align());
-                    ui.text(component.name.clone());
+                    let c = format!("Entity: {}", entity_meta.id.index());
+                    ui.text(c.as_str());
 
-                    unsafe {
-                        for f in 0..component.fields.len() {
-                            let field = &mut component.fields[f];
+                    for i in 0..entity_meta.components.len() {
+                        let component = &mut entity_meta.components[i];
 
-                            match field.type_ {
-                                reflection::FieldType::Invalid => todo!(),
-                                reflection::FieldType::USIZE
-                                | reflection::FieldType::U64
-                                | reflection::FieldType::U32
-                                | reflection::FieldType::U16
-                                | reflection::FieldType::U8 => {
-                                    // Align the ptr
-                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
-
-                                    // Get hashmap value
-                                    let key = (i, f);
-                                    let mut val = self.numbers.get_mut(&key).unwrap();
-
-                                    // create imgui input
-                                    ui.text(field.name.to_string());
-                                    let identifier = ui.push_id(field.name.to_string());
-                                    ui.input_int("##", &mut val).read_only(false).always_overwrite(true).build();
-                                    identifier.end();
-
-                                    // Update the value
-                                    let mut v = val.clone() as u64;
-                                    let val_ptr = (&mut v as *mut u64) as *mut u8;
-                                    let field_size = field.type_.get_size();
-                                    copy_nonoverlapping(val_ptr, data_ptr, field_size);
-
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                }
-                                reflection::FieldType::ISIZE
-                                | reflection::FieldType::I64
-                                | reflection::FieldType::I32
-                                | reflection::FieldType::I16
-                                | reflection::FieldType::I8 => {
-                                    // Align the ptr
-                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
-                                    let key = (i, f);
-                                    let mut value = self.numbers.get_mut(&key).unwrap();
-                                    ui.text(field.name.to_string());
-                                    // let text_width = ui.calc_text_size(&field.name);
-                                    //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
-                                    let identifier = ui.push_id(field.name.to_string());
-                                    ui.input_int("##", &mut value).read_only(false).always_overwrite(true).build();
-
-                                    // Pad if needed
-
-                                    identifier.end();
-                                    let mut val = [value.clone() as i64];
-                                    let field_size = field.type_.get_size();
-                                    let val_ptr = ((&mut val as *mut i64) as *mut u8).add(8 - field_size);
-                                    // Pad the val to get the last bytes
-
-                                    copy_nonoverlapping(val_ptr, data_ptr, field_size);
-
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                }
-                                reflection::FieldType::String => {
-                                    // Align the ptr
-                                    data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
-                                    let key = (i, f);
-                                    let mut value = self.texts.get_mut(&key).unwrap();
-                                    ui.text(field.name.to_string());
-                                    //  let mut string = ptr_to_string(data_ptr);
-                                    let mut ss = "ghggggggggggggggggggggggggggggggggggggg".to_string();
-                                    // let text_width = ui.calc_text_size(&field.name);
-                                    //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
-                                    //copy_nonoverlapping((&mut ss as *mut String).cast(), (&mut string as *mut ManuallyDrop<String>), 1);
-                                    let identifier = ui.push_id(field.name.to_string());
-                                    ui.input_text("##", &mut value).read_only(false).always_overwrite(true).build();
-
-                                    // Pad if needed
-                                    let next = ((value) as *mut String).cast::<u8>();
-                                    identifier.end();
-                                    copy_nonoverlapping(next, data_ptr, 24);
-
-                                    data_ptr = data_ptr.add(field.type_.get_size());
-                                }
-                            }
+                        if imgui::CollapsingHeader::new(&component.name).build(ui) {
+                            component.reflect.display_imgui(&mut component.data, ui_ptr);
                         }
+                        // component.reflect.display_imgui(&mut component.data, ui_ptr);
+
+                        // unsafe {
+                        //     for f in 0..component.fields.len() {
+                        //         let field = &mut component.fields[f];
+
+                        //         //     match field.type_ {
+                        //         //         reflection::FieldType::Invalid => todo!(),
+                        //         //         reflection::FieldType::USIZE
+                        //         //         | reflection::FieldType::U64
+                        //         //         | reflection::FieldType::U32
+                        //         //         | reflection::FieldType::U16
+                        //         //         | reflection::FieldType::U8 => {
+                        //         //             // Align the ptr
+                        //         //             data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+
+                        //         //             // Get hashmap value
+                        //         //             let key = (i, f);
+                        //         //             let mut val = self.numbers.get_mut(&key).unwrap();
+
+                        //         //             // create imgui input
+                        //         //             ui.text(field.name.to_string());
+                        //         //             let identifier = ui.push_id(field.name.to_string());
+                        //         //             ui.input_int("##", &mut val).read_only(false).always_overwrite(true).build();
+                        //         //             identifier.end();
+
+                        //         //             // Update the value
+                        //         //             let mut v = val.clone() as u64;
+                        //         //             let val_ptr = (&mut v as *mut u64) as *mut u8;
+                        //         //             let field_size = field.type_.get_size();
+                        //         //             copy_nonoverlapping(val_ptr, data_ptr, field_size);
+                        //         //             let mut test: u64 = 1;
+                        //         //             let mut test2: u64 = 1;
+                        //         //             let mut v = vec![1, 5, 6];
+                        //         //             //for arrays
+                        //         //             // ui.input_scalar_n("hello", &mut v);
+
+                        //         //             // for strings
+                        //         //             data_ptr = data_ptr.add(field.type_.get_size());
+                        //         //         }
+                        //         //         reflection::FieldType::ISIZE
+                        //         //         | reflection::FieldType::I64
+                        //         //         | reflection::FieldType::I32
+                        //         //         | reflection::FieldType::I16
+                        //         //         | reflection::FieldType::I8 => {
+                        //         //             // Align the ptr
+                        //         //             data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+                        //         //             let key = (i, f);
+                        //         //             let mut value = self.numbers.get_mut(&key).unwrap();
+                        //         //             ui.text(field.name.to_string());
+                        //         //             // let text_width = ui.calc_text_size(&field.name);
+                        //         //             //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
+                        //         //             let identifier = ui.push_id(field.name.to_string());
+                        //         //             ui.input_int("##", &mut value).read_only(false).always_overwrite(true).build();
+
+                        //         //             // Pad if needed
+
+                        //         //             identifier.end();
+                        //         //             let mut val = [value.clone() as i64];
+                        //         //             let field_size = field.type_.get_size();
+                        //         //             let val_ptr = ((&mut val as *mut i64) as *mut u8).add(8 - field_size);
+                        //         //             // Pad the val to get the last bytes
+
+                        //         //             copy_nonoverlapping(val_ptr, data_ptr, field_size);
+
+                        //         //             data_ptr = data_ptr.add(field.type_.get_size());
+                        //         //         }
+                        //         //         reflection::FieldType::String => {
+                        //         //             // Align the ptr
+                        //         //             data_ptr = align_ptr(data_ptr, field.type_.get_aligment());
+                        //         //             let key = (i, f);
+                        //         //             let mut value = self.texts.get_mut(&key).unwrap();
+                        //         //             ui.text(field.name.to_string());
+                        //         //             //  let mut string = ptr_to_string(data_ptr);
+                        //         //             let mut ss = "ghggggggggggggggggggggggggggggggggggggg".to_string();
+                        //         //             // let text_width = ui.calc_text_size(&field.name);
+                        //         //             //   ui.same_line_with_spacing(0.0, 50.0 - text_width[0]);
+                        //         //             //copy_nonoverlapping((&mut ss as *mut String).cast(), (&mut string as *mut ManuallyDrop<String>), 1);
+                        //         //             let identifier = ui.push_id(field.name.to_string());
+                        //         //             ui.input_text("##", &mut value).read_only(false).always_overwrite(true).build();
+
+                        //         //             // Pad if needed
+                        //         //             let next = ((value) as *mut String).cast::<u8>();
+                        //         //             identifier.end();
+                        //         //             copy_nonoverlapping(next, data_ptr, 24);
+
+                        //         //             data_ptr = data_ptr.add(field.type_.get_size());
+                        //         //         }
+                        //         //     }
+                        //     }
+                        // }
                     }
-                    ui.spacing();
                 }
-            }
-        });
+            });
         &mut self.active_entity
     }
 }
@@ -463,6 +479,7 @@ impl ImguiApp {
                 deref.components.push(cmp.clone());
             }
         }
+
         imgui.render(
             self.vulkan.window_extent,
             &self.vulkan.swapchain.images[self.vulkan.swapchain.image_index as usize],

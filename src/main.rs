@@ -10,19 +10,25 @@ use bevy::{
     core::{FrameCountPlugin, TaskPoolPlugin},
     log::LogPlugin,
     math::Vec3,
-    prelude::{default, Camera3dBundle, Commands, Component, IntoSystemConfigs, Query, Res, ResMut, With},
+    prelude::{default, Camera3dBundle, Commands, Component, Entity, EventReader, IntoSystemConfigs, NonSendMut, Query, Res, ResMut, With},
     time::TimePlugin,
     transform::components::Transform,
-    window::{Window, WindowPlugin},
+    window::{PrimaryWindow, Window, WindowPlugin},
     DefaultPlugins,
 };
 use bevy_framepace::Limiter;
+use bevy_rapier2d::{
+    plugin::{NoUserData, RapierPhysicsPlugin},
+    render::RapierDebugRenderPlugin,
+};
 use bevy_reflect::{Reflect, TypeRegistration};
-use bevy_winit::WinitPlugin;
+use bevy_winit::{WinitPlugin, WinitWindows};
 use editor::EditorPlugin;
 use winit::{
+    event::{self, WindowEvent},
     event_loop::{self, EventLoop, EventLoopBuilder},
     platform::x11::EventLoopBuilderExtX11,
+    raw_window_handle::HasWindowHandle,
 };
 
 #[derive(Reflect, Component)]
@@ -46,9 +52,34 @@ fn startup(mut r: ResMut<bevy_framepace::FramepaceSettings>) {
 fn main() {
     let mut app = App::new();
     game::setup_game_systmes(&mut app);
-    app.add_plugins((DefaultPlugins, EditorPlugin, bevy_framepace::FramepacePlugin))
-        .add_systems(Startup, (startup))
-        .run();
+    //app.add_plugins((DefaultPlugins)).add_systems(Update, editor::event::handle_all_events).run();
+    app.add_plugins((
+        DefaultPlugins,
+        RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0),
+        RapierDebugRenderPlugin::default(),
+        bevy_framepace::FramepacePlugin,
+        EditorPlugin,
+    ))
+    .add_systems(Startup, (startup))
+    .run();
 
     // app.add_plugins(DefaultPlugins).run();
 }
+
+// fn handle_winit_events(mut events: EventReader<WindowEvent>) {
+//     winit::event::Event::<()>;
+//     for event in events.iter() {
+//         match event {
+//             WindowEvent::Resized(size) => {
+//                 println!("Window resized: {:?}", size);
+//             }
+//             WindowEvent::Moved(pos) => {
+//                 println!("Window moved to: {:?}", pos);
+//             }
+//             WindowEvent::CloseRequested => {
+//                 println!("Window close requested");
+//             }
+//             _ => (),
+//         }
+//     }
+// }

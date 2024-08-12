@@ -1,31 +1,83 @@
-use std::{alloc::Layout, any::Any, borrow::BorrowMut, mem::transmute, ptr::copy_nonoverlapping};
-
 use bevy::{
     a11y::accesskit::Invalid,
     ecs::{component::ComponentId, observer::TriggerTargets},
     log::tracing_subscriber::field,
     prelude::*,
+    ptr::Ptr,
 };
-use bevy_reflect::{DynamicTypePath, GetTypeRegistration, TypeData, TypeRegistration};
+use bevy_reflect::{DynamicTypePath, FromType, GetTypeRegistration, TypeData, TypeRegistration, Typed};
+use imgui::{CollapsingHeader, Ui};
+use std::{
+    alloc::Layout,
+    any::Any,
+    borrow::BorrowMut,
+    mem::{transmute, ManuallyDrop},
+    ptr::copy_nonoverlapping,
+};
+use voxelengine_proc::ImGuiFields;
 
-use super::imgui::align_ptr;
+use super::{
+    imgui::align_ptr,
+    structs::{ReflectTypeData, TReflect, TestComponent},
+    ReflectionMarker,
+};
 
-#[derive(Reflect, Default, Component)]
+#[derive(Reflect, Default, Component, ImGuiFields)]
 #[reflect(Component)]
 pub struct Foo {
     a: usize,
 }
 
+impl TReflect for Foo {
+    fn display_imgui(data: &mut Vec<u8>, imgui: *mut imgui::Ui) {
+        unsafe {
+            let ptr = align_ptr(data.as_mut_ptr(), align_of::<Foo>()).cast::<Foo>();
+            let bar = &mut *ptr;
+            let imgui = &mut *imgui;
+            bar.render_imgui(imgui);
+        }
+    }
+}
+
 /// This `Bar` type is used in the `nested` field on the `Test` type. We must derive `Reflect` here
 /// too (or ignore it)
-#[repr(C)]
-#[derive(Component, Reflect, Debug, Default)]
+#[derive(Component, Reflect, Debug, Default, ImGuiFields)]
 #[reflect(Component)]
 pub struct Bar {
     pub bba: String,
     pub b: u8,
     pub t: u64,
     pub l: u8,
+}
+
+impl TReflect for Bar {
+    fn display_imgui(data: &mut Vec<u8>, imgui: *mut imgui::Ui) {
+        unsafe {
+            let ptr = align_ptr(data.as_mut_ptr(), align_of::<Bar>()).cast::<Bar>();
+            let bar = &mut *ptr;
+            let imgui = &mut *imgui;
+            bar.render_imgui(imgui);
+        }
+    }
+}
+
+impl TReflect for Transform {
+    fn display_imgui(data: &mut Vec<u8>, imgui: *mut imgui::Ui) {
+        unsafe {
+            let ptr = data.as_mut_ptr().cast::<Transform>();
+            let bar = &mut *ptr;
+            let imgui = &mut *imgui;
+
+            let trans_ptr: *mut Vec3 = &mut bar.translation;
+            let transform = trans_ptr.cast::<[f32; 3]>().as_mut().unwrap();
+
+            let scale_ptr: *mut Vec3 = &mut bar.scale;
+            let scale = scale_ptr.cast::<[f32; 3]>().as_mut().unwrap();
+
+            imgui.input_float3("Transform", transform).build();
+            imgui.input_float3("Scale", scale).build();
+        }
+    }
 }
 
 #[derive(Default, Reflect)]
@@ -105,6 +157,7 @@ impl Field {
         Field { name, type_ }
     }
 }
+
 #[repr(C)]
 pub struct Component {
     pub name: String,
@@ -129,7 +182,7 @@ pub struct EntityMeta {
     /// will be used in order to reflect changes later on
     pub id: Entity,
     // used in order to display the information
-    pub components: Vec<Component>,
+    pub components: Vec<TestComponent>,
 }
 
 impl EntityMeta {
@@ -155,13 +208,14 @@ pub struct EntitiesMeta {
     pub data: Vec<EntityMeta>,
 }
 
-#[derive(Component, Default)]
-pub struct ReflectionMarker;
-
 pub fn setup_reflection(world: &World) {
     let type_registry = world.get_resource::<AppTypeRegistry>().unwrap();
     let b = type_registry.write().add_registration(Bar::get_type_registration());
     let b = type_registry.write().add_registration(Foo::get_type_registration());
+
+    type_registry.write().register_type_data::<Bar, ReflectTypeData>();
+    type_registry.write().register_type_data::<Foo, ReflectTypeData>();
+    type_registry.write().register_type_data::<Transform, ReflectTypeData>();
 }
 
 // pub fn setup_entities(mut commands: Commands, world: &World) {
@@ -175,6 +229,30 @@ pub fn overwrite_value(entities_meta: Vec<EntityMeta>) {
 
 pub fn mutate_entities_data(enity_ref: NonSendMut<EntityMeta>) {}
 // query: Query<(EntityRef, &ReflectionMarker)>, mut meta: ResMut<EntitiesMeta>
+
+// if "bevy_sprite::bundle::SpriteBundle"
+// if "bevy_rapier2d::dynamics::rigid_body::RigidBody"
+// if "bevy_rapier2d::geometry::collider::Collider"
+// if "bevy_rapier2d::dynamics::rigid_body::LockedAxes"
+
+pub fn ignore(name: &str) -> bool {
+    if name == "bevy_sprite::bundle::SpriteBundle"
+        || name == "bevy_rapier2d::dynamics::rigid_body::RigidBody"
+        || name == "bevy_rapier2d::geometry::collider::Collider"
+        || name == "bevy_rapier2d::dynamics::rigid_body::LockedAxes"
+        || name == "bevy_transform::components::global_transform::GlobalTransform"
+        || name == "bevy_sprite::sprite::Sprite"
+        || name == "bevy_asset::handle::Handle<bevy_render::texture::image::Image>"
+        || name == "bevy_render::view::visibility::Visibility"
+        || name == "bevy_render::view::visibility::ViewVisibility"
+        || name == "bevy_render::view::visibility::InheritedVisibility"
+        || name == "bevy_render::primitives::Aabb"
+    {
+        return true;
+    }
+    return false;
+}
+
 pub fn parse_world_entities_data(world: &mut World) {
     let mut entities_meta = vec![];
     {
@@ -190,27 +268,58 @@ pub fn parse_world_entities_data(world: &mut World) {
             let entity_meta = &mut entities_meta[last_index];
             for component_id in archetype.components() {
                 if let Some(component_info) = world.components().get_info(component_id) {
+                    if ignore(component_info.name()) {
+                        continue;
+                    } else {
+                        if type_registry.get(component_info.type_id().unwrap()).is_none() {
+                            continue;
+                        }
+                    }
+
                     let is_reflect = type_registry.get(component_info.type_id().unwrap());
                     match is_reflect {
                         Some(reflect_component) => {
                             let u = reflect_component.clone();
-
-                            component_info.layout();
+                            let reflect_trait = type_registry.get_type_data::<ReflectTypeData>(u.type_id()).unwrap().clone();
                             let data = entity.get_by_id(component_id).unwrap();
-                            let tuple = parse(reflect_component, data.as_ptr(), component_info.layout().align());
-                            let mut d: Vec<u8> = vec![0; tuple.1];
+                            let layout = component_info.layout();
 
+                            let mut d: Vec<u8> = vec![0; component_info.layout().size()];
                             unsafe {
-                                std::ptr::copy_nonoverlapping(data.as_ptr(), d.as_mut_ptr(), tuple.1);
-
-                                entity_meta.components.push(Component {
-                                    name: reflect_component.type_info().type_path_table().short_path().to_owned(), // TODO, can do this
-                                    fields: tuple.0,
-                                    layout: component_info.layout(),
-                                    data: d,
-                                    id: component_id,
-                                });
+                                copy_nonoverlapping(data.as_ptr(), d.as_mut_ptr(), component_info.layout().size());
                             }
+                            entity_meta.components.push(TestComponent {
+                                name: component_info.name().to_owned(),
+                                id: component_id,
+                                data: d,
+                                reflect: reflect_trait,
+                                layout,
+                            });
+                            // // if special_treatment(component_info.name()) {
+                            // //     entity_meta.components.push(Component {
+                            // //         name: reflect_component.type_info().type_path_table().short_path().to_owned(), // TODO, can do this
+                            // //         fields: vec![],
+                            // //         layout: component_info.layout(),
+                            // //         data: vec![],
+                            // //         id: component_id,
+                            // //     });
+                            // // }
+
+                            // let tuple = { parse(reflect_component, data.as_ptr(), component_info.layout().align()) };
+
+                            // let mut d = vec![0; tuple.1];
+
+                            // unsafe {
+                            //     copy_nonoverlapping(data.as_ptr(), d.as_mut_ptr(), tuple.1);
+
+                            //     entity_meta.components.push(Component {
+                            //         name: reflect_component.type_info().type_path_table().short_path().to_owned(), // TODO, can do this
+                            //         fields: tuple.0,
+                            //         layout: component_info.layout(),
+                            //         data: d,
+                            //         id: component_id,
+                            //     });
+                            // }
                         }
                         None => {}
                     }
@@ -240,9 +349,7 @@ pub fn mutate_data(world: &mut World) {
 
 pub fn write_out_data(query: Query<&Bar>) {
     for bar in query.iter() {
-        println!("b: {}", bar.b);
-        println!("bba: {}", bar.bba);
-        println!("t: {}", bar.t);
+        println!("bar: {}", bar.bba);
     }
 }
 
@@ -257,7 +364,6 @@ fn parse(generic_component: &TypeRegistration, data_ptr: *mut u8, alignment: usi
                 let field_name = x.field_at(i).unwrap().name().to_owned();
                 let field_ident = field.ident().unwrap();
                 let field_type = FieldType::from(field_ident);
-                
 
                 // add offset of field
                 new_ptr = align_ptr(new_ptr, field_type.get_aligment());
