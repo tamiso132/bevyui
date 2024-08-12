@@ -1,3 +1,6 @@
 [submodule "voxelengine"]
 	path = voxelengine
 	url = https://github.com/tamiso132/voxelengine.git
+[submodule "voxelengine-proc"]
+	path = voxelengine-proc
+	url = https://github.com/tamiso132/voxelengine-proc.git
