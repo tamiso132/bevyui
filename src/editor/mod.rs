@@ -4,15 +4,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub mod event;
-
 use ash::{
     valve::mutable_descriptor_type,
     vk::{self, Extent2D},
 };
 use bevy::{
-    app::{Plugin, Startup, Update},
+    app::{MainScheduleOrder, Plugin, Startup, Update},
+    ecs::schedule::ScheduleLabel,
     prelude::*,
+    time::common_conditions::on_timer,
 };
 use bevy_winit::WinitWindows;
 use imgui::ImguiApp;
@@ -23,9 +23,14 @@ use winit::{
     raw_window_handle::HasWindowHandle,
 };
 
+mod display;
 mod imgui;
 mod reflection;
 mod structs;
+mod t_reflect;
+
+#[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
+struct PrepareUpdate;
 
 #[derive(Component, Default)]
 pub struct ReflectionMarker;
@@ -39,19 +44,6 @@ impl EditorPlugin {
         mut entities_meta: NonSendMut<EntitiesMeta>,
         mut entity: NonSendMut<EntityMeta>,
     ) {
-        // let diff = entities_meta.data.len() - context.entities.len();
-        // if diff > 0 {
-        //     for _ in 0..diff {
-        //         context.entities.push(EntityMeta::default());
-        //     }
-        // }
-
-        // unsafe {
-        //     let src_ptr = entities_meta.data.as_ptr();
-        //     let dst_ptr = context.application.entities.as_mut_ptr();
-
-        //     std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, entities_meta.data.len());
-        // }
         context.run_non_block(&mut event_loop, &mut entities_meta, &mut entity);
     }
 }
@@ -77,20 +69,42 @@ fn setup(world: &mut World) {
     world.insert_non_send_resource(reflection::EntitiesMeta { data: vec![] });
     world.insert_non_send_resource(EntityMeta::default());
     world.insert_non_send_resource(event_loop);
+
+    let type_registry = world.get_resource::<AppTypeRegistry>().unwrap();
+
+    // REFLECTION
+    t_reflect::register_bevy_types(type_registry);
+
+    // REMOVE IF NOT USED
+    Bar::register(type_registry);
+    Foo::register(type_registry);
+}
+pub fn reveal_map(mut query: Query<&mut Visibility>) {
+    for mut i in query.iter_mut() {
+        if *i == Visibility::Visible {
+            //    *i = Visibility::Hidden;
+        }
+    }
 }
 
 impl Plugin for EditorPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, (setup, test_spawn, reflection::setup_reflection).chain());
+        app.init_schedule(PrepareUpdate);
+
+        app.world_mut().resource_mut::<MainScheduleOrder>().insert_after(PostUpdate, PreUpdate);
+
+        app.add_systems(Startup, (setup, test_spawn).chain());
         app.add_systems(
-            Update,
+            PreUpdate,
             (
                 reflection::parse_world_entities_data,
                 EditorPlugin::update_imgui,
                 reflection::mutate_data,
-                reflection::write_out_data,
+                reflection::check_component_delete,
+                reveal_map,
             )
-                .chain(),
+                .chain()
+                .run_if(on_timer(Duration::from_millis(30))),
         );
     }
 }

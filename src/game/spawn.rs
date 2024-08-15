@@ -1,7 +1,7 @@
 use bevy::{
     asset::Handle,
-    prelude::{default, Commands, Transform},
-    sprite::SpriteBundle,
+    prelude::{default, Commands, Component, GlobalTransform, InheritedVisibility, Transform, ViewVisibility, Visibility},
+    sprite::{Sprite, SpriteBundle},
 };
 use bevy_rapier2d::prelude::{Collider, LockedAxes, RigidBody};
 
@@ -51,11 +51,13 @@ pub fn spawn_wall(commands: &mut Commands, mut position: Position, texture_wall:
 
     commands.spawn((
         position,
-        SpriteBundle {
-            texture: texture_wall,
-            transform: Transform::from_xyz(position.x as f32, position.y as f32, 0.),
-            ..default()
-        },
+        texture_wall,
+        Sprite::default(),
+        Transform::from_xyz(position.x as f32, position.y as f32, 0.),
+        GlobalTransform::default(),
+        Visibility::Visible,
+        InheritedVisibility::VISIBLE,
+        ViewVisibility::HIDDEN,
         RigidBody::Fixed,
         Collider::cuboid(32.0 / 2.0, 32.0 / 2.0),
         ReflectionMarker,

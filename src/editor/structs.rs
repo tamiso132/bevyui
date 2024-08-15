@@ -3,7 +3,7 @@ use std::alloc::Layout;
 use bevy::{ecs::component::ComponentId, prelude::ReflectComponent};
 use bevy_reflect::{FromType, Reflect};
 
-use super::{imgui::align_ptr, reflection::Component};
+use super::reflection::Bar;
 
 #[derive(Clone)]
 pub struct TestComponent {
@@ -12,10 +12,11 @@ pub struct TestComponent {
     pub data: Vec<u8>,
     pub reflect: ReflectTypeData,
     pub layout: Layout,
+    pub is_removed: bool,
 }
 
 pub trait TReflect {
-    fn display_imgui(data: &mut Vec<u8>, imgui: *mut imgui::Ui);
+    fn display_imgui(data: &mut [u8], ui: *mut imgui::Ui);
 }
 
 #[derive(Clone)]
