@@ -4,7 +4,7 @@ use bevy::{
     color::{ColorToComponents, LinearRgba},
     input::ButtonInput,
     math::{Vec2, Vec3, VectorSpace},
-    prelude::{Camera2dBundle, Commands, Component, IntoSystemConfigs, KeyCode, Query, Rectangle, Res, ResMut, With},
+    prelude::{Camera2dBundle, Commands, Component, IntoSystemConfigs, IntoSystemSet, KeyCode, Query, Rectangle, Res, ResMut, With},
     render::mesh::Mesh,
     sprite::{ColorMaterial, SpriteBundle},
     time::Time,
@@ -50,6 +50,8 @@ pub struct Crate {
 pub struct Wall;
 
 pub fn setup_game_systmes(app: &mut App) {
+    let b = setup_game;
+    b.into_system_set();
     app.add_systems(Startup, setup_game);
     app.add_systems(Update, (sprite_movement, update_position, check_win_conditions).chain());
 }
