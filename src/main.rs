@@ -23,7 +23,6 @@ use editor::EditorPlugin;
 use winit::{
     event::{self, WindowEvent},
     event_loop::{self, EventLoop, EventLoopBuilder},
-    platform::x11::EventLoopBuilderExtX11,
     raw_window_handle::HasWindowHandle,
 };
 
@@ -54,7 +53,7 @@ fn main() {
 
     //app.add_plugins((DefaultPlugins)).add_systems(Update, editor::event::handle_all_events).run();
     app.add_plugins((
-        DefaultPlugins,
+       // DefaultPlugins,
         RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0),
         RapierDebugRenderPlugin::default(),
         EditorPlugin,

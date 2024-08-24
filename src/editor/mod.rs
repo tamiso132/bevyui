@@ -76,8 +76,8 @@ fn setup(world: &mut World) {
     t_reflect::register_bevy_types(type_registry);
 
     // REMOVE IF NOT USED
-    Bar::register(type_registry);
-    Foo::register(type_registry);
+   // Bar::register(type_registry);
+   // Foo::register(type_registry);
 }
 pub fn reveal_map(mut query: Query<&mut Visibility>) {
     for mut i in query.iter_mut() {
