@@ -53,7 +53,7 @@ fn main() {
 
     //app.add_plugins((DefaultPlugins)).add_systems(Update, editor::event::handle_all_events).run();
     app.add_plugins((
-       // DefaultPlugins,
+        DefaultPlugins,
         RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0),
         RapierDebugRenderPlugin::default(),
         EditorPlugin,

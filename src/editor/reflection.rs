@@ -28,6 +28,17 @@ pub struct Foo {
     a: usize,
 }
 
+
+#[derive(Reflect, Default, Component, BevyField)]
+#[reflect(Component)]
+struct NumberWizard {
+    max: i32,
+    min: i32,
+    guess_text: String,
+    guess: i32,
+}
+
+
 // impl TReflect for Foo {
 //     fn display_imgui(data: &mut Vec<u8>, imgui: *mut imgui::Ui) {
 //         unsafe {

@@ -6,10 +6,13 @@ use super::{
     structs::{ReflectTypeData, TReflect},
 };
 
+
+
 pub fn register_bevy_types(registry: &AppTypeRegistry) {
     registry.write().register::<LockedAxes>();
     registry.write().register::<ViewVisibility>();
     registry.write().register::<RigidBody>();
+    registry.write().register::<Transform>();
 
     registry.write().register_type_data::<Transform, ReflectTypeData>();
     registry.write().register_type_data::<LockedAxes, ReflectTypeData>();
